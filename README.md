@@ -33,4 +33,14 @@ Or using yarn:
 ```bash
 yarn add mediawiki-sdk
 ```
-When compiling the source code, be sure to write: `npm i`!
+
+## Build / Development
+
+If you want to build from source:
+
+```bash
+git clone https://github.com/DimaYastrebov/mediawiki-sdk.git
+cd mediawiki-sdk
+npm install      # install dependencies
+npm run build    # compile TypeScript to JavaScript
+```
