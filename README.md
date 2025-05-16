@@ -9,6 +9,8 @@
 
 **MediaWiki SDK** is a Node.js SDK, written in TypeScript, for interacting with the MediaWiki API. It provides methods to interface with MediaWiki-based platforms (such as Wikipedia, Wikidata, Fandom) and supports both JavaScript and TypeScript projects.
 
+Check out the [Wiki](https://github.com/DimaYastrebov/mediawiki-sdk/wiki) for guides and usage examples.
+
 ## Features
 
 *   **Detailed Page Information**: Fetch comprehensive data for pages, including content (`extracts`), categories, revisions, links, and associated metadata.
