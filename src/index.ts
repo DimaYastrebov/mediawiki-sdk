@@ -1,4 +1,4 @@
-import { Cookie, CookieStore } from "./cookie-store";
+import { Cookie, CookieStore } from "./cookie-store.js";
 
 /**
  * Possible output formats for the MediaWiki API.
@@ -1415,31 +1415,31 @@ export interface MediaWikiQueryOpenSearchOptions {
  * 
  * @see https://www.mediawiki.org/wiki/API:Opensearch
  */
-export interface MediaWikiQueryOpenSearchResponse extends MediaWikiBaseResponse {
+export type MediaWikiQueryOpenSearchResponse = [
     /**
      * The search query string that was used to perform the search.
      * @example "Hello World"
      */
-    query: string;
+    query: string,
 
     /**
      * An array of search results titles.
      * @example ["Hello World", "\"Hello, World!\" program", "Hello World (film)", ...]
      */
-    results: string[];
+    results: string[],
 
     /**
      * An array of descriptions corresponding to each search result.
      * @example ["", "", "", ...]
      */
-    descriptions: string[];
+    descriptions: string[],
 
     /**
      * An array of URLs corresponding to each search result.
      * @example ["https://en.wikipedia.org/wiki/Hello_World", "https://en.wikipedia.org/wiki/%22Hello,_World!%22_program", ...]
      */
-    urls: string[];
-}
+    urls: string[],
+];
 
 /**
  * Options for parsing wikitext or page content using the MediaWiki `action=parse` API.

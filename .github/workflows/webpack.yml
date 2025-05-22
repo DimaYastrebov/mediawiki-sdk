@@ -27,6 +27,7 @@ jobs:
         npm install
         npm install --save-dev ts-loader
         npx webpack
+        echo "Build finished successfully at $(date)"
 
     - name: Run tests and generate coverage
       run: npx jest --coverage --passWithNoTests
