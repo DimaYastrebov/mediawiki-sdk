@@ -1,4 +1,4 @@
-import { Cookie, CookieStore } from "./cookie-store.js";
+import { Cookie, CookieStore } from "./cookie-store";
 
 /**
  * Possible output formats for the MediaWiki API.
