@@ -736,7 +736,7 @@ describe('Response Wrapper Classes', () => {
                         // but the current class implementation relies on Object.keys(pages)[0]
                         '1': { // Re-aligning with how the class constructor gets pageDetails
                             ...pageDetails,
-                            categories: [ {ns:14, title: "Category:RealTitle", "*": "Category:StarTitle" } ]
+                            categories: [ {ns:14, title: "Category:RealTitle" } ]
                         } as MediaWikiQueryPageFullDetails
                     }
                 }
@@ -826,11 +826,11 @@ describe('Response Wrapper Classes', () => {
         const summaryResponse = new MediaWikiQuerySummaryResponseClass(summaryData);
         it('text() should return extract from the first page', () => expect(summaryResponse.text()).toBe('This is the summary.'));
         it('text() should return empty string if no pages or extract', () => {
-            const noExtractData: MediaWikiQuerySummaryResponse = { batchcomplete: true, query: { pages: [{...summaryData.query.pages[0], extract: undefined }] } };
+            const noExtractData: MediaWikiQuerySummaryResponse = { batchcomplete: true, query: { normalized: [], pages: [{...summaryData.query.pages[0], extract: "" }] } };
             const resp = new MediaWikiQuerySummaryResponseClass(noExtractData);
             expect(resp.text()).toBe('');
             
-            const noPagesData: MediaWikiQuerySummaryResponse = { batchcomplete: true, query: { pages: [] } };
+            const noPagesData: MediaWikiQuerySummaryResponse = { batchcomplete: true, query: { normalized: [], pages: [] } };
             const resp2 = new MediaWikiQuerySummaryResponseClass(noPagesData);
             expect(resp2.text()).toBe('');
         });
