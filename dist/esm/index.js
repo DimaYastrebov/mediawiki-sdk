@@ -94,7 +94,7 @@ export class MediaWikiQueryParseResponseClass {
      * @example 123456
      */
     categories() {
-        return this.parse?.categories?.map((c) => c["*"]) ?? [];
+        return this.categories?.() ?? [];
     }
 }
 /**
@@ -479,7 +479,8 @@ export class MediaWiki {
                     rvlimit: options.rvlimit,
                     exintro: options.exintro,
                     explaintext: options.explaintext,
-                    uiprop: options.uiprop
+                    uiprop: options.uiprop,
+                    type: options.type
                 };
                 const filteredParams = this.filterParams(queryParams);
                 return this.fetchData({

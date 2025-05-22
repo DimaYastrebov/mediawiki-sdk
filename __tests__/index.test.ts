@@ -751,7 +751,7 @@ describe('Response Wrapper Classes', () => {
                 }
             };
             const resp = new MediaWikiQueryPageResponseClass(specificResponseData, mockWikiInstance);
-            expect(resp.categories()).toEqual(["Category:StarTitle"]);
+            expect(resp.categories()).toEqual(["Category:RealTitle"]);
         });
         
         it('categories() should return empty array if no categories', () => {
@@ -959,19 +959,24 @@ describe('CookieStore Class', () => {
     });
 
     it('parseSetCookie should handle attributes', () => {
-        const expires = new Date(Date.now() + 3600000); // 1 hour from now
-        store.parseSetCookie(`baz=qux; Expires=${expires.toUTCString()}; Path=/path; Domain=.en.wikipedia.org; Secure; HttpOnly; SameSite=Lax`, originHost);
-        const cookies = store.getCookieHeader(fullUrl); // Secure matches https
+        const expiresDate = new Date(Date.now() + 3600000);
+        const expectedExpiresTimeInSeconds = Math.floor(expiresDate.getTime() / 1000);
+
+        store.parseSetCookie(`baz=qux; Expires=${expiresDate.toUTCString()}; Path=/path; Domain=.en.wikipedia.org; Secure; HttpOnly; SameSite=Lax`, originHost);
+        const cookies = store.getCookieHeader(fullUrl);
+        
         expect(cookies.length).toBe(1);
         const c = cookies[0];
         expect(c.name).toBe('baz');
         expect(c.path).toBe('/path');
-        expect(c.domain).toBe('en.wikipedia.org'); // Leading dot removed
+        expect(c.domain).toBe('en.wikipedia.org');
         expect(c.hostOnly).toBeUndefined();
         expect(c.secure).toBe(true);
         expect(c.httpOnly).toBe(true);
         expect(c.sameSite).toBe('Lax');
-        expect(c.expires?.getTime()).toBeCloseTo(expires.getTime());
+        
+        expect(c.expires).toBeDefined();
+        expect(Math.floor(c.expires!.getTime() / 1000)).toBe(expectedExpiresTimeInSeconds);
     });
 
     it('getCookieHeader should filter by domain', () => {

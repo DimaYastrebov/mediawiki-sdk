@@ -1,4 +1,4 @@
-import { Cookie, CookieStore } from "./cookie-store";
+import { Cookie, CookieStore } from "./cookie-store.js";
 
 /**
  * Possible output formats for the MediaWiki API.
@@ -1568,7 +1568,7 @@ export class MediaWikiQueryParseResponseClass implements MediaWikiQueryParseResp
      * @example 123456
      */
     categories(): string[] {
-        return this.parse?.categories?.map((c: any) => c["*"]) ?? [];
+        return this.categories?.() ?? [];
     }
 }
 
@@ -3804,7 +3804,8 @@ export class MediaWiki {
                 rvlimit: options.rvlimit,
                 exintro: options.exintro,
                 explaintext: options.explaintext,
-                uiprop: options.uiprop
+                uiprop: options.uiprop,
+                type: options.type
             };
 
             const filteredParams = this.filterParams(queryParams);
