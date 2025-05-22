@@ -1167,7 +1167,7 @@ class MediaWiki {
         getToken: async (options) => {
             const query = {
                 meta: ["tokens"],
-                type: options.type
+                type: options.type.join("|")
             };
             const res = await this.client.query(query);
             if (!res || !res.query) {

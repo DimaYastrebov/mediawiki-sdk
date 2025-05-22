@@ -1,4 +1,4 @@
-import { Cookie, CookieStore } from "./cookie-store";
+import { Cookie, CookieStore } from "./cookie-store.js";
 
 /**
  * Possible output formats for the MediaWiki API.
@@ -198,7 +198,7 @@ export interface MediaWikiPageOptions {
     exintro?: boolean;
     explaintext?: boolean;
     uiprop?: string;
-    type?: string[];
+    type?: any;
     srinfo?: string;
     srprop?: string[];
 }
@@ -4103,7 +4103,7 @@ export class MediaWiki {
         getToken: async (options: MediaWikiQueryTokensOptions): Promise<MediaWikiQueryTokensResponseClass> => {
             const query: MediaWikiPageOptions = {
                 meta: ["tokens"],
-                type: options.type
+                type: options.type.join("|")
             };
 
             const res = await this.client.query(query);

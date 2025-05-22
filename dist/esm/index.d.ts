@@ -180,7 +180,7 @@ export interface MediaWikiPageOptions {
     exintro?: boolean;
     explaintext?: boolean;
     uiprop?: string;
-    type?: string[];
+    type?: any;
     srinfo?: string;
     srprop?: string[];
 }
