@@ -44,5 +44,5 @@ If you want to build from source:
 git clone https://github.com/DimaYastrebov/mediawiki-sdk.git
 cd mediawiki-sdk
 npm install      # install dependencies
-npm run build    # compile TypeScript to JavaScript
+npm run build:all    # compile TypeScript to JavaScript
 ```
