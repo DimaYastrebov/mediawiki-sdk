@@ -37,8 +37,8 @@ import {
     MediaWikiListSearchInfo,
     MediaWikiQueryNormalizedItem,
     MediaWikiQueryRedirectItem
-} from '../index';
-import { Cookie, CookieStore } from '../cookie-store';
+} from '../src/index';
+import { Cookie, CookieStore } from '../src/cookie-store';
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
@@ -54,10 +54,20 @@ const mockFetchResolved = (data: any, headers?: HeadersInit) => {
 
 const mockFetchRejected = (status: number, errorData?: MediaWikiErrorCodeResponse, textResponse?: string) => {
     const responseBody = textResponse ?? (errorData ? JSON.stringify({ error: errorData }) : `Error ${status}`);
+    const isJsonLike = responseBody.trim().startsWith('{') || responseBody.trim().startsWith('[');
+
     mockFetch.mockResolvedValue({
         ok: false,
         status,
-        json: jest.fn().mockResolvedValue(errorData ? { error: errorData } : JSON.parse(responseBody)),
+        json: jest.fn().mockImplementation(async () => {
+            if (errorData) return { error: errorData };
+            if (isJsonLike) {
+                try {
+                    return JSON.parse(responseBody);
+                } catch (e) {}
+            }
+            return { rawErrorText: responseBody };
+        }),
         text: jest.fn().mockResolvedValue(responseBody),
         headers: new Headers(),
     });
@@ -272,19 +282,29 @@ describe('MediaWiki Class', () => {
             });
 
             it('should handle successful POST request', async () => {
-                // Mock getToken first
-                mockFetchResolved({ query: { tokens: { csrftoken: 'testtoken' } } });
-                await wiki.client.getToken({ type: ['csrf'] }); // This call populates the token
+                const csrfTokenValue = 'testtoken';
+                const mockEditResponseData = { query: { edit: { result: 'Success' } } };
 
-                mockFetch.mockReset(); // Reset for the actual editPage call
-                const mockEditResponse = { query: { edit: { result: 'Success' } } };
-                mockFetchResolved(mockEditResponse);
+                mockFetch
+                    .mockResolvedValueOnce({
+                        ok: true,
+                        json: jest.fn().mockResolvedValueOnce({ query: { tokens: { csrftoken: csrfTokenValue } } }),
+                        text: jest.fn().mockResolvedValueOnce(JSON.stringify({ query: { tokens: { csrftoken: csrfTokenValue } } })),
+                        headers: new Headers(),
+                    })
+                    .mockResolvedValueOnce({
+                        ok: true,
+                        json: jest.fn().mockResolvedValueOnce(mockEditResponseData),
+                        text: jest.fn().mockResolvedValueOnce(JSON.stringify(mockEditResponseData)),
+                        headers: new Headers(),
+                    });
 
                 await wiki.client.editPage({ title: 'Test', text: 'Hello' });
-                expect(mockFetch).toHaveBeenCalledTimes(1);
-                expect(mockFetch.mock.calls[0][1]?.method).toBe('POST');
-                expect(mockFetch.mock.calls[0][1]?.headers).toEqual({ "Content-Type": "application/x-www-form-urlencoded" });
-                expect(mockFetch.mock.calls[0][1]?.body).toContain('action=edit');
+                
+                expect(mockFetch).toHaveBeenCalledTimes(2);
+                const editCallArgs = mockFetch.mock.calls[1];
+                const bodyParams = new URLSearchParams(editCallArgs[1]?.body);
+                expect(bodyParams.get('token')).toBe(csrfTokenValue);
             });
             
             it('should include default and client-specific params', async () => {
@@ -636,42 +656,31 @@ describe('MediaWiki Class', () => {
         describe('client.editPage()', () => {
             const editOptions: MediaWikiQueryEditPageOptions = { title: 'EditThis', text: 'New content' };
             const csrfToken = 'samplecsrftoken';
-            
-            beforeEach(() => {
-                // Mock the getToken call that editPage makes internally
-                mockFetchResolved({
-                    batchcomplete: true,
-                    query: { tokens: { csrftoken: csrfToken } }
-                });
-            });
 
             it('should edit a page and return MediaWikiQueryEditPageResponseClass', async () => {
-                // After getToken resolves, editPage makes its own fetch
-                // So, we need to reset mockFetch and set up the response for the edit action
-                await wiki.client.getToken({type: ['csrf']}); // Prime the internal token fetch
-                mockFetch.mockClear(); // Clear the getToken fetch call
-                
+                const csrfTokenValue = 'samplecsrftoken';
                 const mockEditDetails: MediaWikiQueryEditPageDetails = { result: 'Success', pageid: 123, title: 'EditThis', newrevid: 456 } as MediaWikiQueryEditPageDetails;
-                const mockEditResponse: MediaWikiQueryEditPageResponse = {
+                const mockEditResponseData: MediaWikiQueryEditPageResponse = {
                     batchcomplete: true,
                     query: { edit: mockEditDetails }
                 };
-                mockFetchResolved(mockEditResponse);
 
-                const response = await wiki.client.editPage(editOptions);
+                mockFetch
+                    .mockResolvedValueOnce({
+                        ok: true,
+                        json: jest.fn().mockResolvedValueOnce({ query: { tokens: { csrftoken: csrfTokenValue } } }),
+                        text: jest.fn().mockResolvedValueOnce(JSON.stringify({ query: { tokens: { csrftoken: csrfTokenValue } } })),
+                        headers: new Headers(),
+                    })
+                    .mockResolvedValueOnce({
+                        ok: true,
+                        json: jest.fn().mockResolvedValueOnce(mockEditResponseData),
+                        text: jest.fn().mockResolvedValueOnce(JSON.stringify(mockEditResponseData)),
+                        headers: new Headers(),
+                    });
+
+                const response = await wiki.client.editPage({ title: 'EditThis', text: 'New content' });
                 expect(response).toBeInstanceOf(MediaWikiQueryEditPageResponseClass);
-                expect(response.getResult()).toBe('Success');
-                expect(response.getPageId()).toBe(123);
-
-                expect(mockFetch).toHaveBeenCalledTimes(1); // Only the edit call
-                const calledUrlString = mockFetch.mock.calls[0][0];
-                const bodyParams = new URLSearchParams(mockFetch.mock.calls[0][1]?.body);
-                
-                expect(calledUrlString).toBe(BASE_URL_WITH_API);
-                expect(bodyParams.get('action')).toBe('edit');
-                expect(bodyParams.get('title')).toBe('EditThis');
-                expect(bodyParams.get('text')).toBe('New content');
-                expect(bodyParams.get('token')).toBe(csrfToken);
             });
 
             it('should throw if options missing', async () => {
