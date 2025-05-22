@@ -6,6 +6,7 @@
 [![Bundle size](https://badgen.net/bundlephobia/minzip/mediawiki-sdk)](https://bundlephobia.com/result?p=mediawiki-sdk)
 [![License: ISC](https://img.shields.io/badge/License-ISC-yellow.svg)](https://opensource.org/licenses/ISC)
 [![ESM in browser](https://img.shields.io/badge/browser-support-green.svg)](https://www.jsdelivr.com/package/npm/mediawiki-sdk)
+[![codecov](https://codecov.io/gh/DimaYastrebov/mediawiki-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/DimaYastrebov/mediawiki-sdk)
 
 **MediaWiki SDK** is a Node.js SDK, written in TypeScript, for interacting with the MediaWiki API. It provides methods to interface with MediaWiki-based platforms (such as Wikipedia, Wikidata, Fandom) and supports both JavaScript and TypeScript projects.
 
