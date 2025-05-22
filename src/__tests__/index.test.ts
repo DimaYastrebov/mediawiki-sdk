@@ -63,8 +63,8 @@ const mockFetchRejected = (status: number, errorData?: MediaWikiErrorCodeRespons
     });
 };
 
-const BASE_URL_WITH_API = 'https://example.com/w/api.php';
-const BASE_URL_WITHOUT_API = 'https://example.com/w';
+const BASE_URL_WITH_API = 'https://en.wikipedia.org/w/api.php';
+const BASE_URL_WITHOUT_API = 'https://en.wikipedia.org/w';
 
 describe('MediaWiki Class', () => {
     beforeEach(() => {
@@ -918,8 +918,8 @@ describe('Response Wrapper Classes', () => {
 
 describe('CookieStore Class', () => {
     let store: CookieStore;
-    const originHost = 'example.com';
-    const fullUrl = 'https://example.com/path';
+    const originHost = 'en.wikipedia.org';
+    const fullUrl = 'https://en.wikipedia.org/path';
 
     beforeEach(() => {
         store = new CookieStore();
@@ -938,13 +938,13 @@ describe('CookieStore Class', () => {
 
     it('parseSetCookie should handle attributes', () => {
         const expires = new Date(Date.now() + 3600000); // 1 hour from now
-        store.parseSetCookie(`baz=qux; Expires=${expires.toUTCString()}; Path=/path; Domain=.example.com; Secure; HttpOnly; SameSite=Lax`, originHost);
+        store.parseSetCookie(`baz=qux; Expires=${expires.toUTCString()}; Path=/path; Domain=.en.wikipedia.org; Secure; HttpOnly; SameSite=Lax`, originHost);
         const cookies = store.getCookieHeader(fullUrl); // Secure matches https
         expect(cookies.length).toBe(1);
         const c = cookies[0];
         expect(c.name).toBe('baz');
         expect(c.path).toBe('/path');
-        expect(c.domain).toBe('example.com'); // Leading dot removed
+        expect(c.domain).toBe('en.wikipedia.org'); // Leading dot removed
         expect(c.hostOnly).toBeUndefined();
         expect(c.secure).toBe(true);
         expect(c.httpOnly).toBe(true);
@@ -953,13 +953,13 @@ describe('CookieStore Class', () => {
     });
 
     it('getCookieHeader should filter by domain', () => {
-        store.parseSetCookie('a=1; Domain=example.com', originHost);
-        store.parseSetCookie('b=2; Domain=sub.example.com', originHost);
+        store.parseSetCookie('a=1; Domain=en.wikipedia.org', originHost);
+        store.parseSetCookie('b=2; Domain=sub.en.wikipedia.org', originHost);
         store.parseSetCookie('c=3; Domain=other.com', originHost);
 
-        expect(store.getCookieHeader('https://example.com/').map(c => c.name)).toEqual(['a']);
-        expect(store.getCookieHeader('https://sub.example.com/').map(c => c.name).sort()).toEqual(['a', 'b'].sort());
-        expect(store.getCookieHeader('https://another.sub.example.com/').map(c => c.name)).toEqual(['a']); // a matches due to domain=.example.com
+        expect(store.getCookieHeader('https://en.wikipedia.org/').map(c => c.name)).toEqual(['a']);
+        expect(store.getCookieHeader('https://sub.en.wikipedia.org/').map(c => c.name).sort()).toEqual(['a', 'b'].sort());
+        expect(store.getCookieHeader('https://another.sub.en.wikipedia.org/').map(c => c.name)).toEqual(['a']); // a matches due to domain=.en.wikipedia.org
         expect(store.getCookieHeader('https://other.com/').map(c => c.name)).toEqual(['c']);
     });
 
@@ -968,18 +968,18 @@ describe('CookieStore Class', () => {
         store.parseSetCookie('p2=val; Path=/path', originHost);
         store.parseSetCookie('p3=val; Path=/path/deep', originHost);
 
-        expect(store.getCookieHeader('https://example.com/').map(c => c.name)).toEqual(['p1']);
-        expect(store.getCookieHeader('https://example.com/path').map(c => c.name).sort()).toEqual(['p1', 'p2'].sort());
-        expect(store.getCookieHeader('https://example.com/path/deeper').map(c => c.name).sort()).toEqual(['p1', 'p2', 'p3'].sort());
-        expect(store.getCookieHeader('https://example.com/other').map(c => c.name)).toEqual(['p1']);
+        expect(store.getCookieHeader('https://en.wikipedia.org/').map(c => c.name)).toEqual(['p1']);
+        expect(store.getCookieHeader('https://en.wikipedia.org/path').map(c => c.name).sort()).toEqual(['p1', 'p2'].sort());
+        expect(store.getCookieHeader('https://en.wikipedia.org/path/deeper').map(c => c.name).sort()).toEqual(['p1', 'p2', 'p3'].sort());
+        expect(store.getCookieHeader('https://en.wikipedia.org/other').map(c => c.name)).toEqual(['p1']);
     });
 
     it('getCookieHeader should filter by secure flag', () => {
         store.parseSetCookie('s1=val; Secure', originHost);
         store.parseSetCookie('s2=val', originHost); // Not secure
 
-        expect(store.getCookieHeader('https://example.com/').map(c => c.name).sort()).toEqual(['s1', 's2'].sort());
-        expect(store.getCookieHeader('http://example.com/').map(c => c.name)).toEqual(['s2']); // s1 is secure-only
+        expect(store.getCookieHeader('https://en.wikipedia.org/').map(c => c.name).sort()).toEqual(['s1', 's2'].sort());
+        expect(store.getCookieHeader('http://en.wikipedia.org/').map(c => c.name)).toEqual(['s2']); // s1 is secure-only
     });
 
     it('getCookieHeader should filter expired cookies', () => {
