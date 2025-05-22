@@ -701,7 +701,7 @@ describe('Response Wrapper Classes', () => {
     describe('MediaWikiQueryPageResponseClass', () => {
         const pageDetails: MediaWikiQueryPageFullDetails = {
             pageid: 1, ns: 0, title: 'Test Page', extract: '<p>Hello</p>',
-            categories: [{ ns: 14, title: 'Category:A' }, { '*': 'Category:B' } as any] // Mixed type for test
+            categories: [{ ns: 14, title: 'Category:A' }, { '*': 'Category:B' }] // Mixed type for test
         } as MediaWikiQueryPageFullDetails;
         const responseData: MediaWikiQueryPageResponse = {
             batchcomplete: true,
@@ -835,13 +835,26 @@ describe('Response Wrapper Classes', () => {
         const summaryResponse = new MediaWikiQuerySummaryResponseClass(summaryData);
         it('text() should return extract from the first page', () => expect(summaryResponse.text()).toBe('This is the summary.'));
         it('text() should return empty string if no pages or extract', () => {
-            const noExtractData: MediaWikiQuerySummaryResponse = { batchcomplete: true, query: { normalized: [], pages: [{...summaryData.query.pages[0], extract: "" }] } };
-            const resp = new MediaWikiQuerySummaryResponseClass(noExtractData);
-            expect(resp.text()).toBe('');
+            const summaryDataWithEmptyExtract: MediaWikiQuerySummaryResponse = {
+                batchcomplete: true,
+                query: { normalized: [], pages: [{ pageid: 1, ns: 0, title: 'Summary Page', extract: '' }] }
+            };
+            const resp1 = new MediaWikiQuerySummaryResponseClass(summaryDataWithEmptyExtract);
+            expect(resp1.text()).toBe('');
             
-            const noPagesData: MediaWikiQuerySummaryResponse = { batchcomplete: true, query: { normalized: [], pages: [] } };
-            const resp2 = new MediaWikiQuerySummaryResponseClass(noPagesData);
+            const summaryDataNoPages: MediaWikiQuerySummaryResponse = {
+                batchcomplete: true,
+                query: { normalized: [], pages: [] }
+            };
+            const resp2 = new MediaWikiQuerySummaryResponseClass(summaryDataNoPages);
             expect(resp2.text()).toBe('');
+
+            const summaryDataNoExtractField: MediaWikiQuerySummaryResponse = {
+                batchcomplete: true,
+                query: { normalized: [], pages: [{ pageid: 1, ns: 0, title: 'Summary Page' } as any] }
+            };
+            const resp3 = new MediaWikiQuerySummaryResponseClass(summaryDataNoExtractField);
+            expect(resp3.text()).toBe('');
         });
     });
 
@@ -968,7 +981,7 @@ describe('CookieStore Class', () => {
 
         expect(store.getCookieHeader('https://en.wikipedia.org/').map(c => c.name)).toEqual(['a']);
         expect(store.getCookieHeader('https://sub.en.wikipedia.org/').map(c => c.name).sort()).toEqual(['a', 'b'].sort());
-        expect(store.getCookieHeader('https://another.sub.en.wikipedia.org/').map(c => c.name)).toEqual(['a']); // a matches due to domain=.en.wikipedia.org
+        expect(store.getCookieHeader('https://another.sub.en.wikipedia.org/').map(c => c.name).sort()).toEqual(['a', 'b'].sort()); // a matches due to domain=.en.wikipedia.org
         expect(store.getCookieHeader('https://other.com/').map(c => c.name)).toEqual(['c']);
     });
 

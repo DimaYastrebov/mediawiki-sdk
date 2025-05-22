@@ -899,7 +899,7 @@ export class MediaWikiQueryPageResponseClass implements MediaWikiQueryPageRespon
      * @example "<p>Hello <strong>world</strong>!</p>"
      */
     html(): string {
-        return this.query?.pages[0]?.extract ?? "";
+        return this.pageDetails?.extract ?? "";
     }
 
     /**
@@ -907,7 +907,7 @@ export class MediaWikiQueryPageResponseClass implements MediaWikiQueryPageRespon
      * @example "Main Page"
      */
     title(): string {
-        return this.query?.pages[0]?.title ?? "";
+        return this.pageDetails?.title ?? "";
     }
 
     /**
@@ -915,7 +915,7 @@ export class MediaWikiQueryPageResponseClass implements MediaWikiQueryPageRespon
      * @example 123456
      */
     categories(): string[] {
-        return this.query?.pages[0]?.categories?.map((c: any) => c["*"]) ?? [];
+        return this.pageDetails?.categories?.map((c: MediaWikiQueryPageCategoryItem) => c.title) ?? [];
     }
 
     /**
@@ -1689,7 +1689,7 @@ export class MediaWikiQuerySummaryResponseClass implements MediaWikiQuerySummary
      * @example "JavaScript is a programming language..."
      */
     text(): string {
-        return this.query?.pages[0].extract ?? "";
+        return this.query?.pages?.[0]?.extract ?? "";
     }
 }
 
@@ -4108,8 +4108,8 @@ export class MediaWiki {
 
             const res = await this.client.query(query);
 
-            if (!res || !res.query) {
-                return new MediaWikiQueryTokensResponseClass(res as unknown as MediaWikiQueryTokensResponseClass);
+            if (!res || !res.query || !res.query.tokens) {
+                throw new Error(`Failed to retrieve tokens or unexpected response structure: ${JSON.stringify(res)}`);
             }
 
             return new MediaWikiQueryTokensResponseClass(res as MediaWikiQueryTokensResponseClass);

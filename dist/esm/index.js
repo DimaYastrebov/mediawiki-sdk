@@ -16,21 +16,21 @@ export class MediaWikiQueryPageResponseClass {
      * @example "<p>Hello <strong>world</strong>!</p>"
      */
     html() {
-        return this.query?.pages[0]?.extract ?? "";
+        return this.pageDetails?.extract ?? "";
     }
     /**
      * Returns the title of the page.
      * @example "Main Page"
      */
     title() {
-        return this.query?.pages[0]?.title ?? "";
+        return this.pageDetails?.title ?? "";
     }
     /**
      * Returns the page ID of the parsed page.
      * @example 123456
      */
     categories() {
-        return this.query?.pages[0]?.categories?.map((c) => c["*"]) ?? [];
+        return this.pageDetails?.categories?.map((c) => c.title) ?? [];
     }
     /**
      * Edits this page.
@@ -111,7 +111,7 @@ export class MediaWikiQuerySummaryResponseClass {
      * @example "JavaScript is a programming language..."
      */
     text() {
-        return this.query?.pages[0].extract ?? "";
+        return this.query?.pages?.[0]?.extract ?? "";
     }
 }
 /**
@@ -736,8 +736,8 @@ export class MediaWiki {
                     type: options.type.join("|")
                 };
                 const res = await this.client.query(query);
-                if (!res || !res.query) {
-                    return new MediaWikiQueryTokensResponseClass(res);
+                if (!res || !res.query || !res.query.tokens) {
+                    throw new Error(`Failed to retrieve tokens or unexpected response structure: ${JSON.stringify(res)}`);
                 }
                 return new MediaWikiQueryTokensResponseClass(res);
             },
