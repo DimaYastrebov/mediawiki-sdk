@@ -1,0 +1,60 @@
+{
+  "type": "commonjs",
+  "name": "mediawiki-sdk",
+  "version": "0.5.0",
+  "description": "TypeScript SDK for generating and working with WikiText and MediaWiki API. Allows to get pages from wiki projects built on mediawiki.",
+  "author": "DimaYastrebov",
+  "license": "ISC",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "browser": "./dist/esm/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DimaYastrebov/mediawiki-sdk.git"
+  },
+  "homepage": "https://github.com/DimaYastrebov/mediawiki-sdk#readme",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/cjs/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "bugs": {
+    "url": "https://github.com/DimaYastrebov/mediawiki-sdk/issues"
+  },
+  "scripts": {
+    "build:cjs": "tsc -p tsconfig.cjs.json",
+    "build:esm": "tsc -p tsconfig.esm.json",
+    "build:all": "npm run build:cjs && npm run build:esm",
+    "build": "npm run build:cjs",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mediawiki-ts",
+    "mediawiki",
+    "wikitext",
+    "wikipedia",
+    "wikimedia",
+    "wiki",
+    "markdown",
+    "parser",
+    "sdk",
+    "typescript",
+    "nodejs",
+    "wikidata",
+    "fandom",
+    "wikibase"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
