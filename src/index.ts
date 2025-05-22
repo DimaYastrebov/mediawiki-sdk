@@ -1564,11 +1564,16 @@ export class MediaWikiQueryParseResponseClass implements MediaWikiQueryParseResp
     }
 
     /**
-     * Returns the page ID of the parsed page.
-     * @example 123456
+     * Returns a list of categories for the parsed page.
+     * @example ["Living people", "Software developers", "Ukrainians"]
      */
     categories(): string[] {
-        return this.categories?.() ?? [];
+        if (this.parse && Array.isArray(this.parse.categories)) {
+            return this.parse.categories
+                .map((cat: any) => cat && typeof cat === 'object' && cat['*'])
+                .filter(Boolean) as string[];
+        }
+        return [];
     }
 }
 
