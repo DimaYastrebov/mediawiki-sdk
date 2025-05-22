@@ -2,31 +2,32 @@ import { Cookie } from "./cookie-store.js";
 /**
  * Possible output formats for the MediaWiki API.
  */
-type formatOutput = "json" | "none" | "php" | "rawfm" | "xml";
+export type formatOutput = "json" | "none" | "php" | "rawfm" | "xml";
 /**
  * Possible format versions for the MediaWiki API output.
  */
-type formatVersion = 1 | 2;
+export type formatVersion = 1 | 2;
 /**
  * Possible values for the 'prop' parameter in the 'query' action.
  * These specify which properties to retrieve for pages.
  */
-type MediaWikiPageOptionsProp = "categories" | "categoryinfo" | "contributors" | "deletedrevisions" | "duplicatefiles" | "extlinks" | "extracts" | "fileusage" | "imageinfo" | "images" | "info" | "infobox" | "iwlinks" | "langlinks" | "links" | "linkshere" | "pageprops" | "redirects" | "revisions" | "stashimageinfo" | "templates" | "transcludedin" | "transcodestatus" | "videoinfo";
+export type MediaWikiPageOptionsProp = "categories" | "categoryinfo" | "contributors" | "deletedrevisions" | "duplicatefiles" | "extlinks" | "extracts" | "fileusage" | "imageinfo" | "images" | "info" | "infobox" | "iwlinks" | "langlinks" | "links" | "linkshere" | "pageprops" | "redirects" | "revisions" | "stashimageinfo" | "templates" | "transcludedin" | "transcodestatus" | "videoinfo";
 /**
  * Possible values for the 'list' parameter in the 'query' action.
  * These specify which lists of pages/data to retrieve.
  */
-type MediaWikiPageOptionsList = "allcategories" | "alldeletedrevisions" | "allfileusages" | "allimages" | "allinfoboxes" | "alllinks" | "allpages" | "allredirects" | "allrevisions" | "alltransclusions" | "allusers" | "backlinks" | "blocks" | "categorymembers" | "embeddedin" | "exturlusage" | "filearchive" | "imageusage" | "iwbacklinks" | "langbacklinks" | "linterrors" | "logevents" | "messagecollection" | "mystashedfiles" | "pagepropnames" | "pageswithprop" | "prefixsearch" | "protectedtitles" | "querypage" | "random" | "recentchanges" | "search" | "tags" | "usercontribs" | "users" | "watchlist" | "watchlistraw";
+export type MediaWikiPageOptionsList = "allcategories" | "alldeletedrevisions" | "allfileusages" | "allimages" | "allinfoboxes" | "alllinks" | "allpages" | "allredirects" | "allrevisions" | "alltransclusions" | "allusers" | "backlinks" | "blocks" | "categorymembers" | "embeddedin" | "exturlusage" | "filearchive" | "imageusage" | "iwbacklinks" | "langbacklinks" | "linterrors" | "logevents" | "messagecollection" | "mystashedfiles" | "pagepropnames" | "pageswithprop" | "prefixsearch" | "protectedtitles" | "querypage" | "random" | "recentchanges" | "search" | "tags" | "usercontribs" | "users" | "watchlist" | "watchlistraw";
 /**
  * Possible values for the 'meta' parameter in the 'query' action.
  * These specify which meta information about the wiki or user to retrieve.
  */
-type MediaWikiPageOptionsMeta = "allmessages" | "authmanagerinfo" | "filerepoinfo" | "languageinfo" | "languagestats" | "linterstats" | "managemessagegroups" | "messagegroups" | "messagegroupstats" | "messagetranslations" | "notifications" | "siteinfo" | "tokens" | "unreadnotificationpages" | "userinfo" | "oath";
-type MediaWikiSearchOptions = "nearmatch" | "text" | "title";
+export type MediaWikiPageOptionsMeta = "allmessages" | "authmanagerinfo" | "filerepoinfo" | "languageinfo" | "languagestats" | "linterstats" | "managemessagegroups" | "messagegroups" | "messagegroupstats" | "messagetranslations" | "notifications" | "siteinfo" | "tokens" | "unreadnotificationpages" | "userinfo" | "oath";
+export type MediaWikiSearchOptions = "nearmatch" | "text" | "title";
+export type MediaWikiTokensOptions = "*" | "createaccount" | "csrf" | "login" | "patrol" | "rollback" | "userrights" | "watch";
 /**
  * Options for initializing the MediaWiki client.
  */
-interface MediaWikiOptions {
+export interface MediaWikiOptions {
     /**
      * The base URL of the MediaWiki API (e.g., "https://en.wikipedia.org/w/api.php" or "https://en.wikipedia.org/w").
      * Required.
@@ -66,9 +67,34 @@ interface MediaWikiOptions {
     utf8?: boolean | null;
 }
 /**
+ * Internal options for the fetchData method.
+ */
+export interface fetchDataOptions {
+    /**
+     * HTTP method for the request (e.g., "GET", "POST").
+     */
+    method: "GET" | "POST";
+    /**
+     * URL for the request.
+     */
+    url: string;
+    /**
+     * Request parameters.
+     */
+    params?: Record<string, any>;
+    /**
+     * Request headers.
+     */
+    headers?: Record<string, string>;
+    /**
+     * Request body data (for methods like POST).
+     */
+    data?: any;
+}
+/**
  * Options for the 'query' action. Specifies what data to retrieve.
  */
-interface MediaWikiPageOptions {
+export interface MediaWikiPageOptions {
     action?: "query";
     /**
      * A single page title to query.
@@ -158,7 +184,7 @@ interface MediaWikiPageOptions {
     srinfo?: string;
     srprop?: string[];
 }
-interface MediaWikiErrorCodeResponse {
+export interface MediaWikiErrorCodeResponse {
     code: string;
     info: string;
     docref?: string;
@@ -167,7 +193,7 @@ interface MediaWikiErrorCodeResponse {
 /**
  * Base structure for common MediaWiki API response elements.
  */
-interface MediaWikiBaseResponse {
+export interface MediaWikiBaseResponse {
     /** Indicates if the batch is complete. API might return "" which coerces to true/false. */
     batchcomplete: boolean;
     /** Warnings returned by the API, possibly related to specific modules like 'extracts'. */
@@ -186,38 +212,38 @@ interface MediaWikiBaseResponse {
     error?: MediaWikiErrorCodeResponse;
 }
 /** Defines the general continuation token. */
-interface GeneralContinue {
+export interface GeneralContinue {
     continue: string;
 }
 /** Defines the continuation token for page content. */
-interface PageContentContinue {
+export interface PageContentContinue {
     pccontinue: string;
 }
 /** Defines the continuation token for external links. */
-interface ExternalLinksContinue {
+export interface ExternalLinksContinue {
     elcontinue: string;
 }
 /** Defines the continuation token for interwiki links. */
-interface InterwikiLinksContinue {
+export interface InterwikiLinksContinue {
     iwcontinue: string;
 }
 /** Defines the continuation token for page links. */
-interface PageLinksContinue {
+export interface PageLinksContinue {
     plcontinue: string;
 }
 /** Defines the continuation token for links here. */
-interface LinksHereContinue {
+export interface LinksHereContinue {
     lhcontinue: string;
 }
 /** Defines the continuation token for templates. */
-interface TemplatesContinue {
+export interface TemplatesContinue {
     tlcontinue: string;
 }
 /**
  * Describes the comprehensive 'continue' block that may be returned by the MediaWiki API.
  * Fields are based on common continuation parameters. All listed are required as per your example.
  */
-interface MediaWikiComprehensiveContinueBlock extends GeneralContinue, PageContentContinue, ExternalLinksContinue, InterwikiLinksContinue, PageLinksContinue, LinksHereContinue, TemplatesContinue {
+export interface MediaWikiComprehensiveContinueBlock extends GeneralContinue, PageContentContinue, ExternalLinksContinue, InterwikiLinksContinue, PageLinksContinue, LinksHereContinue, TemplatesContinue {
     /**
      * Allows for other module-specific continuation tokens (e.g., rncontinue, srcontinue, etc.)
      * @example { "rncontinue": "abcdef", "srcontinue": "12345" }
@@ -228,7 +254,7 @@ interface MediaWikiComprehensiveContinueBlock extends GeneralContinue, PageConte
  * Information about a normalized title from a MediaWiki API query.
  * @example { "fromencoded": false, "from": "main page", "to": "Main Page" }
  */
-interface MediaWikiQueryNormalizedItem {
+export interface MediaWikiQueryNormalizedItem {
     /** Indicates if the source title was encoded. */
     fromencoded: boolean;
     /** The original title. */
@@ -240,7 +266,7 @@ interface MediaWikiQueryNormalizedItem {
  * Information about a redirected title from a MediaWiki API query.
  * @example { "from": "USA", "to": "United States" }
  */
-interface MediaWikiQueryRedirectItem {
+export interface MediaWikiQueryRedirectItem {
     /** Original title. */
     from: string;
     /** Target title. */
@@ -252,7 +278,7 @@ interface MediaWikiQueryRedirectItem {
  * Item representing an image linked on a page.
  * @example { "ns": 6, "title": "File:Example.jpg" }
  */
-interface MediaWikiQueryPageImageItem {
+export interface MediaWikiQueryPageImageItem {
     /** Namespace ID of the image. */
     ns: number;
     /** Title of the image file. */
@@ -262,7 +288,7 @@ interface MediaWikiQueryPageImageItem {
  * Item representing a category the page belongs to.
  * @example { "ns": 14, "title": "Category:Examples" }
  */
-interface MediaWikiQueryPageCategoryItem {
+export interface MediaWikiQueryPageCategoryItem {
     /** Namespace ID of the category. */
     ns: number;
     /** Title of the category page. */
@@ -272,7 +298,7 @@ interface MediaWikiQueryPageCategoryItem {
  * Item representing a contributor to the page.
  * @example { "userid": 123, "name": "ExampleUser" }
  */
-interface MediaWikiQueryPageContributorItem {
+export interface MediaWikiQueryPageContributorItem {
     /** User ID of the contributor. */
     userid: number;
     /** User name of the contributor. */
@@ -282,14 +308,14 @@ interface MediaWikiQueryPageContributorItem {
  * Item representing an external link from the page.
  * @example { "url": "https://www.example.com" }
  */
-interface MediaWikiQueryPageExtlinkItem {
+export interface MediaWikiQueryPageExtlinkItem {
     /** The URL of the external link. */
     url: string;
 }
 /**
  * Information about the flagged revisions status of a page.
  */
-interface MediaWikiQueryPageFlaggedDetails {
+export interface MediaWikiQueryPageFlaggedDetails {
     /** Stable revision ID. */
     stable_revid: number;
     /** Review level. */
@@ -305,7 +331,7 @@ interface MediaWikiQueryPageFlaggedDetails {
  * Item representing an interwiki link from the page.
  * @example { "prefix": "wikt", "title": "example" }
  */
-interface MediaWikiQueryPageInterwikiLinkItem {
+export interface MediaWikiQueryPageInterwikiLinkItem {
     /** Prefix of the interwiki link. */
     prefix: string;
     /** Title of the page on the other wiki. */
@@ -315,7 +341,7 @@ interface MediaWikiQueryPageInterwikiLinkItem {
  * Item representing a language link from the page.
  * @example { "lang": "de", "title": "Beispiel" }
  */
-interface MediaWikiQueryPageLangLinkItem {
+export interface MediaWikiQueryPageLangLinkItem {
     /** Language code. */
     lang: string;
     /** Title of the page in the other language. */
@@ -325,7 +351,7 @@ interface MediaWikiQueryPageLangLinkItem {
  * Item representing an internal link from the page.
  * @example { "ns": 0, "title": "Another Page" }
  */
-interface MediaWikiQueryPageInternalLinkItem {
+export interface MediaWikiQueryPageInternalLinkItem {
     /** Namespace ID of the target page. */
     ns: number;
     /** Title of the target page. */
@@ -335,7 +361,7 @@ interface MediaWikiQueryPageInternalLinkItem {
  * Item representing a page that links to the current page.
  * @example { "pageid": 456, "ns": 0, "title": "Linking Page", "redirect": false }
  */
-interface MediaWikiQueryPageLinkHereItem {
+export interface MediaWikiQueryPageLinkHereItem {
     /** Page ID of the linking page. */
     pageid: number;
     /** Namespace ID of the linking page. */
@@ -349,7 +375,7 @@ interface MediaWikiQueryPageLinkHereItem {
  * Page properties obtained via `prop=pageprops`.
  * @example { "page_image": "Example.jpg", "wikibase_item": "Q42" }
  */
-interface MediaWikiQueryPagePropsDetails {
+export interface MediaWikiQueryPagePropsDetails {
     /** The page image. */
     page_image: string;
     /** Wikibase badge information (example key). */
@@ -363,7 +389,7 @@ interface MediaWikiQueryPagePropsDetails {
  * Terms associated with the page (e.g., labels, descriptions from Wikibase).
  * @example { "label": ["Example Label"], "description": ["An example description."] }
  */
-interface MediaWikiQueryPageTermsDetails {
+export interface MediaWikiQueryPageTermsDetails {
     /** Labels associated with the page. */
     label: string[];
     /** Descriptions associated with the page. */
@@ -373,13 +399,13 @@ interface MediaWikiQueryPageTermsDetails {
  * Page view data, keyed by date.
  * @example { "2023-01-01": 100, "2023-01-02": 150 }
  */
-interface MediaWikiQueryPageViewsDetails {
+export interface MediaWikiQueryPageViewsDetails {
     [date: string]: number | null;
 }
 /**
  * Details of a single page revision.
  */
-interface MediaWikiQueryPageRevisionItem {
+export interface MediaWikiQueryPageRevisionItem {
     /**
      * The unique identifier for this revision.
      * @example 123456789
@@ -428,7 +454,7 @@ interface MediaWikiQueryPageRevisionItem {
  * Item representing a template used on the page.
  * @example { "ns": 10, "title": "Template:Example" }
  */
-interface MediaWikiQueryPageTemplateItem {
+export interface MediaWikiQueryPageTemplateItem {
     /** Namespace ID of the template. */
     ns: number;
     /** Title of the template page. */
@@ -438,7 +464,7 @@ interface MediaWikiQueryPageTemplateItem {
  * Item representing a page that transcludes the current page.
  * @example { "pageid": 789, "ns": 0, "title": "Transcluding Page", "redirect": false }
  */
-interface MediaWikiQueryPageTranscludedInItem {
+export interface MediaWikiQueryPageTranscludedInItem {
     /** Page ID of the transcluding page. */
     pageid: number;
     /** Namespace ID of the transcluding page. */
@@ -448,48 +474,48 @@ interface MediaWikiQueryPageTranscludedInItem {
     /** Indicates if the transclusion is via a redirect. (Marked as optional) */
     redirect?: boolean;
 }
-interface MediaWikiQueryCategoriesItem {
+export interface MediaWikiQueryCategoriesItem {
     pageid: number;
     ns: number;
     title: string;
     categories: MediaWikiQueryPageTemplateItem[];
 }
-interface MediaWikiQueryRevisionsItem {
+export interface MediaWikiQueryRevisionsItem {
     pageid: number;
     ns: number;
     title: string;
     revisions: MediaWikiQueryPageRevisionItem[];
 }
-interface MediaWikiQuerySummaryItem {
+export interface MediaWikiQuerySummaryItem {
     pageid: number;
     ns: number;
     title: string;
     extract: string;
 }
 /** Target title information for CirrusSearch suggestions. */
-interface MediaWikiQueryCirrusTargetTitle {
+export interface MediaWikiQueryCirrusTargetTitle {
     title: string;
     namespace: number;
 }
 /** Suggestion input and weight for CirrusSearch. */
-interface MediaWikiQueryCirrusSuggestInput {
+export interface MediaWikiQueryCirrusSuggestInput {
     input: string[];
     weight: number;
 }
 /** Deeply nested score detail item for CirrusSearch score explanation. */
-interface MediaWikiQueryCirrusScoreDetailItem {
+export interface MediaWikiQueryCirrusScoreDetailItem {
     value: number;
     description: string;
     details?: MediaWikiQueryCirrusScoreDetailItem[];
 }
 /** Represents the score explanation structure in CirrusSearch suggestions. */
-interface MediaWikiQueryCirrusScoreExplanation {
+export interface MediaWikiQueryCirrusScoreExplanation {
     value: number;
     description: string;
     details?: MediaWikiQueryCirrusScoreDetailItem[];
 }
 /** Structure for an item in the `cirruscompsuggestbuilddoc` record. */
-interface MediaWikiQueryCirrusCompSuggestBuildDocItem {
+export interface MediaWikiQueryCirrusCompSuggestBuildDocItem {
     batch_id: number;
     source_doc_id: string;
     target_title: MediaWikiQueryCirrusTargetTitle;
@@ -498,7 +524,7 @@ interface MediaWikiQueryCirrusCompSuggestBuildDocItem {
     score_explanation: MediaWikiQueryCirrusScoreExplanation;
 }
 /** Detailed structure for `cirrusbuilddoc`. */
-interface MediaWikiQueryCirrusBuildDocDetails {
+export interface MediaWikiQueryCirrusBuildDocDetails {
     version: number;
     wiki: string;
     page_id: number;
@@ -527,29 +553,29 @@ interface MediaWikiQueryCirrusBuildDocDetails {
     [key: string]: any;
 }
 /** No-operation hints for CirrusSearch build document metadata. */
-interface MediaWikiQueryCirrusBuildDocMetadataNoopHints {
+export interface MediaWikiQueryCirrusBuildDocMetadataNoopHints {
     version: string;
     [key: string]: any;
 }
 /** Mandatory reduction stats for CirrusSearch size limiter. */
-interface MediaWikiQueryCirrusBuildDocMetadataSizeLimiterMandatoryReduction {
+export interface MediaWikiQueryCirrusBuildDocMetadataSizeLimiterMandatoryReduction {
     opening_text: number;
     [key: string]: any;
 }
 /** Document size stats for CirrusSearch size limiter. */
-interface MediaWikiQueryCirrusBuildDocMetadataSizeLimiterDocument {
+export interface MediaWikiQueryCirrusBuildDocMetadataSizeLimiterDocument {
     original_length: number;
     new_length: number;
     [key: string]: any;
 }
 /** Size limiter stats for CirrusSearch build document metadata. */
-interface MediaWikiQueryCirrusBuildDocMetadataSizeLimiterStats {
+export interface MediaWikiQueryCirrusBuildDocMetadataSizeLimiterStats {
     mandatory_reduction: MediaWikiQueryCirrusBuildDocMetadataSizeLimiterMandatoryReduction;
     document: MediaWikiQueryCirrusBuildDocMetadataSizeLimiterDocument;
     [key: string]: any;
 }
 /** Metadata for CirrusSearch build document. */
-interface MediaWikiQueryCirrusBuildDocMetadataDetails {
+export interface MediaWikiQueryCirrusBuildDocMetadataDetails {
     cluster_group: string;
     noop_hints: MediaWikiQueryCirrusBuildDocMetadataNoopHints;
     size_limiter_stats: MediaWikiQueryCirrusBuildDocMetadataSizeLimiterStats;
@@ -561,7 +587,7 @@ interface MediaWikiQueryCirrusBuildDocMetadataDetails {
  * Uses the decomposed types for its properties.
  * All fields are kept as in your "full" example, many are effectively optional depending on `prop`.
  */
-interface MediaWikiQueryPageFullDetails {
+export interface MediaWikiQueryPageFullDetails {
     /** The unique identifier for the page. */
     pageid: number;
     /** The namespace ID of the page. */
@@ -641,7 +667,7 @@ interface MediaWikiQueryPageFullDetails {
  * Item returned by `list=random`.
  * @example { "id": 123, "ns": 0, "title": "Random Page" }
  */
-interface MediaWikiListRandomItem {
+export interface MediaWikiListRandomItem {
     id: number;
     ns: number;
     title: string;
@@ -650,7 +676,7 @@ interface MediaWikiListRandomItem {
  * Item returned by `list=search`.
  * @example { "ns": 0, "title": "Search Result", "pageid": 456, "snippet": "A snippet of the page..." }
  */
-interface MediaWikiListSearchItem {
+export interface MediaWikiListSearchItem {
     ns: number;
     title: string;
     pageid?: number;
@@ -671,7 +697,7 @@ interface MediaWikiListSearchItem {
  * Metadata for `list=search` results.
  * @example { "totalhits": 100, "suggestion": "corrected search query" }
  */
-interface MediaWikiListSearchInfo {
+export interface MediaWikiListSearchInfo {
     totalhits: number;
     suggestion?: string;
     suggestionsnippet?: string;
@@ -679,7 +705,7 @@ interface MediaWikiListSearchInfo {
 /**
  * The main `query` object within a MediaWiki API response, using decomposed types.
  */
-interface MediaWikiQueryStructure {
+export interface MediaWikiQueryStructure {
     /** Information about normalized titles. */
     normalized?: MediaWikiQueryNormalizedItem[];
     /** Information about redirected titles. */
@@ -707,7 +733,7 @@ interface MediaWikiQueryStructure {
  * The complete structure of a response from the MediaWiki API's 'query' action.
  * This combines base elements, continuation data, and the specific query payload.
  */
-interface MediaWikiQueryResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQueryResponse extends MediaWikiBaseResponse {
     /**
      * Continuation data for paginated results.
      * The presence of this block and its specific fields depend on the query and results.
@@ -734,7 +760,7 @@ interface MediaWikiQueryResponse extends MediaWikiBaseResponse {
     /** Standard MediaWiki API error object, often returned at the top level for critical errors. */
     error?: MediaWikiErrorCodeResponse;
 }
-interface MediaWikiQuerySearchResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQuerySearchResponse extends MediaWikiBaseResponse {
     query: {
         searchInfo: MediaWikiListSearchInfo;
         search: MediaWikiListSearchItem[];
@@ -745,7 +771,7 @@ interface MediaWikiQuerySearchResponse extends MediaWikiBaseResponse {
  * from the `client.page` method, which typically requests page properties.
  * This structure expects a 'pages' object.
  */
-interface MediaWikiQueryForPageMethod {
+export interface MediaWikiQueryForPageMethod {
     /** Information about normalized titles, if any. */
     normalized?: MediaWikiQueryNormalizedItem[];
     /** Information about redirected titles, if any. */
@@ -765,7 +791,7 @@ interface MediaWikiQueryForPageMethod {
  * The specific response structure for the `client.page` method.
  * It extends the base response and includes a query structure focused on page details.
  */
-interface MediaWikiQueryPageResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQueryPageResponse extends MediaWikiBaseResponse {
     /**
      * Continuation data for paginated results, if any.
      */
@@ -791,7 +817,7 @@ interface MediaWikiQueryPageResponse extends MediaWikiBaseResponse {
     /** Standard MediaWiki API error object. */
     error?: MediaWikiErrorCodeResponse;
 }
-declare class MediaWikiQueryPageResponseClass implements MediaWikiQueryPageResponse {
+export declare class MediaWikiQueryPageResponseClass implements MediaWikiQueryPageResponse {
     batchcomplete: boolean;
     query: MediaWikiQueryForPageMethod;
     private wiki;
@@ -825,7 +851,7 @@ declare class MediaWikiQueryPageResponseClass implements MediaWikiQueryPageRespo
  *
  * @see https://www.mediawiki.org/wiki/API:Siteinfo
  */
-interface MediaWikiQuerySiteInfoResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQuerySiteInfoResponse extends MediaWikiBaseResponse {
     query: {
         /**
          * General information about the wiki site.
@@ -1194,7 +1220,7 @@ interface MediaWikiQuerySiteInfoResponse extends MediaWikiBaseResponse {
  *
  * @see https://www.mediawiki.org/wiki/API:Opensearch
  */
-interface MediaWikiQueryOpenSearchOptions {
+export interface MediaWikiQueryOpenSearchOptions {
     /**
      * The search query string to be used for the search.
      * @example "JavaScript"
@@ -1217,7 +1243,7 @@ interface MediaWikiQueryOpenSearchOptions {
  *
  * @see https://www.mediawiki.org/wiki/API:Opensearch
  */
-interface MediaWikiQueryOpenSearchResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQueryOpenSearchResponse extends MediaWikiBaseResponse {
     /**
      * The search query string that was used to perform the search.
      * @example "Hello World"
@@ -1242,7 +1268,7 @@ interface MediaWikiQueryOpenSearchResponse extends MediaWikiBaseResponse {
 /**
  * Options for parsing wikitext or page content using the MediaWiki `action=parse` API.
  */
-interface MediaWikiQueryParseOptions {
+export interface MediaWikiQueryParseOptions {
     /**
      * Title of the page used to interpret the text.
      * Required when using `text`.
@@ -1281,7 +1307,7 @@ interface MediaWikiQueryParseOptions {
 /**
  * Result returned by the MediaWiki `action=parse` API.
  */
-interface MediaWikiQueryParseResponse {
+export interface MediaWikiQueryParseResponse {
     warnings?: {
         parse?: {
             warnings: string;
@@ -1314,7 +1340,7 @@ interface MediaWikiQueryParseResponse {
 /**
  * A helper class to wrap the parse response and provide convenience methods.
  */
-declare class MediaWikiQueryParseResponseClass implements MediaWikiQueryParseResponse {
+export declare class MediaWikiQueryParseResponseClass implements MediaWikiQueryParseResponse {
     warnings?: {
         parse?: {
             warnings: string;
@@ -1345,7 +1371,7 @@ declare class MediaWikiQueryParseResponseClass implements MediaWikiQueryParseRes
 }
 /**
  */
-interface MediaWikiQueryCategoriesOptions {
+export interface MediaWikiQueryCategoriesOptions {
     /**
      * @example "Main_Page"
      */
@@ -1354,7 +1380,7 @@ interface MediaWikiQueryCategoriesOptions {
 /**
  * Result returned by the MediaWiki `action=parse` API.
  */
-interface MediaWikiQueryCategoriesResponse {
+export interface MediaWikiQueryCategoriesResponse {
     /**
      * Continuation token for pagination.
      * This is optional and may not be present in all responses.
@@ -1373,7 +1399,7 @@ interface MediaWikiQueryCategoriesResponse {
  * Represents the options for the MediaWiki API's `action=query&prop=revisions` endpoint.
  * Used to retrieve revision history for a specific page.
  */
-interface MediaWikiQueryRevisionsOptions {
+export interface MediaWikiQueryRevisionsOptions {
     /**
      * The title of the page to retrieve revisions for.
      * @example "JavaScript"
@@ -1389,7 +1415,7 @@ interface MediaWikiQueryRevisionsOptions {
  * Result returned by the MediaWiki `action=parse` API.
  * This contains the revisions associated with the specified page.
  */
-interface MediaWikiQueryRevisionsResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQueryRevisionsResponse extends MediaWikiBaseResponse {
     /**
      * Continuation token for pagination.
      * This is optional and may not be present in all responses.
@@ -1409,7 +1435,7 @@ interface MediaWikiQueryRevisionsResponse extends MediaWikiBaseResponse {
  * Represents the options for the MediaWiki API's `action=query&prop=extracts` endpoint.
  * Used to retrieve a summary of a specific page.
  */
-interface MediaWikiQuerySummaryOptions {
+export interface MediaWikiQuerySummaryOptions {
     /**
      * The title of the page to retrieve a summary for.
      * @example "JavaScript"
@@ -1420,7 +1446,7 @@ interface MediaWikiQuerySummaryOptions {
  * Result returned by the MediaWiki `action=parse` API.
  * This contains the summary associated with the specified page.
  */
-interface MediaWikiQuerySummaryResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQuerySummaryResponse extends MediaWikiBaseResponse {
     /**
      * Continuation token for pagination.
      * This is optional and may not be present in all responses.
@@ -1439,7 +1465,7 @@ interface MediaWikiQuerySummaryResponse extends MediaWikiBaseResponse {
 /**
  * A helper class to wrap the summary response and provide convenience methods.
  */
-declare class MediaWikiQuerySummaryResponseClass implements MediaWikiQuerySummaryResponse {
+export declare class MediaWikiQuerySummaryResponseClass implements MediaWikiQuerySummaryResponse {
     batchcomplete: boolean;
     query: MediaWikiQuerySummaryResponse["query"];
     constructor(data: MediaWikiQuerySummaryResponse);
@@ -1450,11 +1476,53 @@ declare class MediaWikiQuerySummaryResponseClass implements MediaWikiQuerySummar
     text(): string;
 }
 /**
+ * Represents the detailed response data received upon a successful user login
+ * via the MediaWiki API's `action=login` endpoint.
+ * This interface describes the information returned to confirm login and provide necessary tokens.
+ */
+export interface MediaWikiLoginSuccessDetails {
+    /**
+     * The result of the login attempt, typically "Success" for a successful login.
+     */
+    result: string;
+    /**
+     * The numeric user ID of the successfully logged-in user.
+     */
+    lguserid: number;
+    /**
+     * The username of the successfully logged-in user.
+     */
+    lgusername: string;
+    /**
+     * A temporary token received upon successful login, often referred to as `logintoken`.
+     * This token is usually required for subsequent API actions that modify data
+     * (e.g., obtaining a CSRF token for edits).
+     */
+    token: string;
+    /**
+     * A descriptive message regarding the login result. For a successful login,
+     * this might be empty or a general success message. It is NOT the token type.
+     */
+    reason: string;
+}
+/**
+ * Represents the full response structure returned by the MediaWiki API's `action=login` endpoint.
+ * This interface describes the complete JSON object received after attempting to log in a user.
+ */
+export interface MediaWikiLoginApiResponse {
+    /**
+     * Contains the detailed information about the login attempt, including the result status,
+     * user ID, username, and any relevant tokens for subsequent API interactions.
+     * This property is typically present and populated upon both successful and failed login attempts.
+     */
+    login: MediaWikiLoginSuccessDetails;
+}
+/**
  * Represents the structure of the user information returned by the MediaWiki API's `action=query&meta=userinfo` endpoint.
  * This interface defines the shape of the current user's data.
  * @see https://www.mediawiki.org/wiki/API:Userinfo
  */
-interface MediaWikiUser {
+export interface MediaWikiUser {
     /** The numerical ID of the current user. */
     userId: number;
     /** The username of the current user. */
@@ -1466,7 +1534,7 @@ interface MediaWikiUser {
  * These properties control various aspects of the user's interface experience, editing behavior,
  * notification settings, and more.
  */
-interface MediaWikiQueryUserInfoOptions {
+export interface MediaWikiQueryUserInfoOptions {
     /**
      * Determines if the Vector skin should render page content with a limited maximum width for readability.
      * `1` (or `true`) enables limited width, `0` (or `false`) enables full width.
@@ -2197,7 +2265,7 @@ interface MediaWikiQueryUserInfoOptions {
  * Represents the rate limits for various actions in the MediaWiki API.
  * This includes limits for editing, uploading, and other actions.
  */
-interface MediaWikiQueryUserRateLimitValue {
+export interface MediaWikiQueryUserRateLimitValue {
     /** The number of hits allowed within the specified time frame. */
     hits: number;
     /** The time frame in seconds for the rate limit. */
@@ -2207,7 +2275,7 @@ interface MediaWikiQueryUserRateLimitValue {
  * Represents the rate limits for various actions in the MediaWiki API.
  * This includes limits for editing, uploading, and other actions.
  */
-interface MediaWikiQueryUserRateLimitEntry {
+export interface MediaWikiQueryUserRateLimitEntry {
     ip?: MediaWikiQueryUserRateLimitValue;
     user?: MediaWikiQueryUserRateLimitValue;
 }
@@ -2215,7 +2283,7 @@ interface MediaWikiQueryUserRateLimitEntry {
  * Represents the rate limits for various actions in the MediaWiki API.
  * This includes limits for editing, uploading, and other actions.
  */
-interface MediaWikiQueryUserRateLimits {
+export interface MediaWikiQueryUserRateLimits {
     /**
      * Rate limits for editing actions.
      */
@@ -2270,7 +2338,7 @@ interface MediaWikiQueryUserRateLimits {
  * typically returned as part of the `userinfo` data from the MediaWiki API.
  * This structure mirrors an item from an HTTP `Accept-Language` header.
  */
-interface MediaWikiQueryUserAcceptLangItem {
+export interface MediaWikiQueryUserAcceptLangItem {
     /**
      * The quality factor (q-value) for the language, indicating preference.
      * A higher number (up to 1.0) means a stronger preference.
@@ -2285,7 +2353,7 @@ interface MediaWikiQueryUserAcceptLangItem {
  * Represents the IDs of a user across different MediaWiki contexts.
  * This can include a local wiki ID and a global account ID if applicable.
  */
-interface MediaWikiQueryUserCentralIds {
+export interface MediaWikiQueryUserCentralIds {
     /**
      * The unique identifier for the user account on the current local wiki.
      */
@@ -2299,7 +2367,7 @@ interface MediaWikiQueryUserCentralIds {
 /**
  * Indicates whether a global user account is attached or linked to a local account on the current wiki.
  */
-interface MediaWikiQueryUserAttachedLocal {
+export interface MediaWikiQueryUserAttachedLocal {
     /**
      * `true` if the global account is attached to a local account on this wiki; `false` otherwise.
      */
@@ -2310,7 +2378,7 @@ interface MediaWikiQueryUserAttachedLocal {
  * as returned by the MediaWiki API's `action=query&meta=userinfo` endpoint.
  * This includes user IDs, names, groups, rights, preferences, and more.
  */
-interface MediaWikiQueryUserInfoDetails {
+export interface MediaWikiQueryUserInfoDetails {
     /** The unique identifier of the user account. */
     id: number;
     /** The username of the user account. */
@@ -2409,7 +2477,7 @@ interface MediaWikiQueryUserInfoDetails {
  * or authenticated operations on the MediaWiki API. These tokens prevent CSRF attacks
  * and ensure requests are legitimate.
  */
-interface MediaWikiQueryTokensDetails {
+export interface MediaWikiQueryTokensDetails {
     /**
      * A token required for creating new user accounts.
      * Used with the `action=createaccount` endpoint.
@@ -2450,7 +2518,7 @@ interface MediaWikiQueryTokensDetails {
  * Represents the detailed response for a successful page edit operation via the MediaWiki API.
  * This structure typically indicates that an edit request has been processed and saved.
  */
-interface MediaWikiQueryEditPageDetails {
+export interface MediaWikiQueryEditPageDetails {
     /**
      * The result of the edit operation. For a successful edit, this will always be "Success".
      */
@@ -2481,7 +2549,7 @@ interface MediaWikiQueryEditPageDetails {
  * `action=query&meta=userinfo` endpoint. It extends a base response type
  * and specifically contains detailed information about the current user.
  */
-interface MediaWikiQueryUserInfoResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQueryUserInfoResponse extends MediaWikiBaseResponse {
     /**
      * The main query object containing the specific data requested.
      */
@@ -2498,7 +2566,7 @@ interface MediaWikiQueryUserInfoResponse extends MediaWikiBaseResponse {
  * MediaWiki API's `action=query&meta=userinfo` endpoint.
  * It provides convenient methods to extract key user details.
  */
-declare class MediaWikiQueryUserInfoResponseClass implements MediaWikiQueryUserInfoResponse {
+export declare class MediaWikiQueryUserInfoResponseClass implements MediaWikiQueryUserInfoResponse {
     /**
      * Indicates whether the entire batch of requests completed successfully.
      * For single requests, this is typically `true` upon success.
@@ -2563,7 +2631,7 @@ declare class MediaWikiQueryUserInfoResponseClass implements MediaWikiQueryUserI
  * Represents the options for the MediaWiki API's `action=query&meta=tokens` endpoint.
  * This interface defines the parameters used to specify which types of tokens to retrieve.
  */
-interface MediaWikiQueryTokensOptions {
+export interface MediaWikiQueryTokensOptions {
     /**
      * An array of strings specifying the types of tokens to retrieve.
      * Each string should correspond to a valid token type supported by the API (e.g., 'csrf', 'watch', 'patrol').
@@ -2576,7 +2644,7 @@ interface MediaWikiQueryTokensOptions {
  * `action=query&meta=tokens` endpoint. It extends a base response type
  * and specifically contains an object with various security tokens.
  */
-interface MediaWikiQueryTokensResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQueryTokensResponse extends MediaWikiBaseResponse {
     /**
      * The main query object containing the specific data requested.
      */
@@ -2593,7 +2661,7 @@ interface MediaWikiQueryTokensResponse extends MediaWikiBaseResponse {
  * MediaWiki API's `action=query&meta=tokens` endpoint.
  * It provides direct access to the requested token details.
  */
-declare class MediaWikiQueryTokensResponseClass implements MediaWikiQueryTokensResponse {
+export declare class MediaWikiQueryTokensResponseClass implements MediaWikiQueryTokensResponse {
     /**
      * Indicates whether the entire batch of requests completed successfully.
      * For single requests, this is typically `true` upon success.
@@ -2680,7 +2748,7 @@ declare class MediaWikiQueryTokensResponseClass implements MediaWikiQueryTokensR
  * via the `action=edit` API endpoint. These options control various aspects of the edit,
  * such as content, summary, flags, and conflict resolution.
  */
-interface MediaWikiQueryEditPageOptions {
+export interface MediaWikiQueryEditPageOptions {
     /**
      * The title of the page to edit.
      * Use either `title` or `pageid`, but not both.
@@ -2766,7 +2834,7 @@ interface MediaWikiQueryEditPageOptions {
  * `action=edit` endpoint. It extends a base response type
  * and specifically contains details about the result of the edit operation.
  */
-interface MediaWikiQueryEditPageResponse extends MediaWikiBaseResponse {
+export interface MediaWikiQueryEditPageResponse extends MediaWikiBaseResponse {
     /**
      * The main query object containing the specific data requested.
      */
@@ -2782,7 +2850,7 @@ interface MediaWikiQueryEditPageResponse extends MediaWikiBaseResponse {
  * A utility class for handling and accessing the response from a MediaWiki page edit operation.
  * It provides convenient methods to extract key details about the edit result.
  */
-declare class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPageResponse {
+export declare class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPageResponse {
     /**
      * Indicates whether the entire batch of requests completed successfully.
      * For single requests, this is typically `true` upon success.
@@ -3167,4 +3235,3 @@ export declare class MediaWiki {
         editPage: (options: MediaWikiQueryEditPageOptions) => Promise<MediaWikiQueryEditPageResponseClass>;
     };
 }
-export {};

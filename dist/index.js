@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MediaWiki = exports.MediaWikiApiError = void 0;
+exports.MediaWiki = exports.MediaWikiApiError = exports.MediaWikiQueryEditPageResponseClass = exports.MediaWikiQueryTokensResponseClass = exports.MediaWikiQueryUserInfoResponseClass = exports.MediaWikiQuerySummaryResponseClass = exports.MediaWikiQueryParseResponseClass = exports.MediaWikiQueryPageResponseClass = void 0;
 const cookie_store_js_1 = require("./cookie-store.js");
 class MediaWikiQueryPageResponseClass {
     batchcomplete;
@@ -66,6 +66,7 @@ class MediaWikiQueryPageResponseClass {
         return this.wiki.client.editPage(editPayload);
     }
 }
+exports.MediaWikiQueryPageResponseClass = MediaWikiQueryPageResponseClass;
 /**
  * A helper class to wrap the parse response and provide convenience methods.
  */
@@ -106,6 +107,7 @@ class MediaWikiQueryParseResponseClass {
         return this.parse?.categories?.map((c) => c["*"]) ?? [];
     }
 }
+exports.MediaWikiQueryParseResponseClass = MediaWikiQueryParseResponseClass;
 /**
  * A helper class to wrap the summary response and provide convenience methods.
  */
@@ -125,6 +127,7 @@ class MediaWikiQuerySummaryResponseClass {
         return this.query?.pages[0].extract ?? "";
     }
 }
+exports.MediaWikiQuerySummaryResponseClass = MediaWikiQuerySummaryResponseClass;
 /**
  * A utility class for handling and accessing user information retrieved from the
  * MediaWiki API's `action=query&meta=userinfo` endpoint.
@@ -209,6 +212,7 @@ class MediaWikiQueryUserInfoResponseClass {
         return this.query.userinfo.options;
     }
 }
+exports.MediaWikiQueryUserInfoResponseClass = MediaWikiQueryUserInfoResponseClass;
 /**
  * A utility class for handling and accessing security tokens retrieved from the
  * MediaWiki API's `action=query&meta=tokens` endpoint.
@@ -313,6 +317,7 @@ class MediaWikiQueryTokensResponseClass {
         return this.query.tokens.csrftoken;
     }
 }
+exports.MediaWikiQueryTokensResponseClass = MediaWikiQueryTokensResponseClass;
 /**
  * A utility class for handling and accessing the response from a MediaWiki page edit operation.
  * It provides convenient methods to extract key details about the edit result.
@@ -440,6 +445,7 @@ class MediaWikiQueryEditPageResponseClass {
         return this.errors;
     }
 }
+exports.MediaWikiQueryEditPageResponseClass = MediaWikiQueryEditPageResponseClass;
 /**
  * Custom error class for MediaWiki API-specific errors.
  * This class extends the standard `Error` and provides additional properties

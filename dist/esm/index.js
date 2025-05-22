@@ -1,5 +1,5 @@
 import { CookieStore } from "./cookie-store.js";
-class MediaWikiQueryPageResponseClass {
+export class MediaWikiQueryPageResponseClass {
     constructor(data, wikiInstance) {
         this.batchcomplete = data.batchcomplete;
         this.query = data.query;
@@ -62,7 +62,7 @@ class MediaWikiQueryPageResponseClass {
 /**
  * A helper class to wrap the parse response and provide convenience methods.
  */
-class MediaWikiQueryParseResponseClass {
+export class MediaWikiQueryParseResponseClass {
     constructor(data) {
         Object.assign(this, data);
         this.parse = data.parse;
@@ -100,7 +100,7 @@ class MediaWikiQueryParseResponseClass {
 /**
  * A helper class to wrap the summary response and provide convenience methods.
  */
-class MediaWikiQuerySummaryResponseClass {
+export class MediaWikiQuerySummaryResponseClass {
     constructor(data) {
         Object.assign(this, data);
         this.query = data.query;
@@ -119,7 +119,7 @@ class MediaWikiQuerySummaryResponseClass {
  * MediaWiki API's `action=query&meta=userinfo` endpoint.
  * It provides convenient methods to extract key user details.
  */
-class MediaWikiQueryUserInfoResponseClass {
+export class MediaWikiQueryUserInfoResponseClass {
     /**
      * Constructs an instance of `MediaWikiQueryUserInfoResponseClass`.
      * @param data The raw response object from the MediaWiki API's user info query.
@@ -183,7 +183,7 @@ class MediaWikiQueryUserInfoResponseClass {
  * MediaWiki API's `action=query&meta=tokens` endpoint.
  * It provides direct access to the requested token details.
  */
-class MediaWikiQueryTokensResponseClass {
+export class MediaWikiQueryTokensResponseClass {
     /**
      * Constructs an instance of `MediaWikiQueryTokensResponseClass`.
      * @param data The raw response object from the MediaWiki API's tokens query.
@@ -266,7 +266,7 @@ class MediaWikiQueryTokensResponseClass {
  * A utility class for handling and accessing the response from a MediaWiki page edit operation.
  * It provides convenient methods to extract key details about the edit result.
  */
-class MediaWikiQueryEditPageResponseClass {
+export class MediaWikiQueryEditPageResponseClass {
     /**
      * Constructs an instance of `MediaWikiQueryEditPageResponseClass`.
      * @param data The raw response object from the MediaWiki API's edit query.
