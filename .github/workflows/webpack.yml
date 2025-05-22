@@ -27,3 +27,9 @@ jobs:
         npm install
         npm install --save-dev ts-loader
         npx webpack
+
+    - name: Run tests and generate coverage
+      run: npx jest --coverage
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v5
