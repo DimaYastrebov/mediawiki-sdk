@@ -7,3 +7,7 @@ tsconfig.json
 index.js
 
 __tests__
+
+coverage
+
+jest.config.ts

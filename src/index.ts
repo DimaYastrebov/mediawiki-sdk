@@ -2762,9 +2762,9 @@ export interface MediaWikiQueryTokensDetails {
  */
 export interface MediaWikiQueryEditPageDetails {
     /**
-     * The result of the edit operation. For a successful edit, this will always be "Success".
+     * The result of the edit operation. For a successful edit.
      */
-    result: "Success";
+    result: string;
     /** The unique identifier of the page that was edited. */
     pageid: number;
     /** The canonical title of the page that was edited. */
@@ -3188,11 +3188,22 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * Constructs an instance of `MediaWikiQueryEditPageResponseClass`.
      * @param data The raw response object from the MediaWiki API's edit query.
      */
-    constructor(data: MediaWikiQueryEditPageResponse) {
-        this.batchcomplete = data.batchcomplete;
-        this.query = data.query;
-        if (data.warnings) this.warnings = data.warnings;
-        if (data.errors) this.errors = data.errors;
+    constructor(data: MediaWikiQueryEditPageResponse | null | undefined) {
+        const defaultEditDetails: MediaWikiQueryEditPageDetails = {
+            result: "Unknown", pageid: 0, title: "", contentmodel: "wikitext",
+            oldrevid: 0, newrevid: 0, newtimestamp: "", watched: false
+        };
+
+        if (data && typeof data === 'object') {
+            this.batchcomplete = data.batchcomplete ?? false;
+            this.query = data.query ?? { edit: defaultEditDetails };
+            if (!this.query.edit) this.query.edit = defaultEditDetails;
+            if (data.warnings) this.warnings = data.warnings;
+            if (data.errors) this.errors = data.errors;
+        } else {
+            this.batchcomplete = false;
+            this.query = { edit: defaultEditDetails };
+        }
     }
 
     /**
@@ -3201,7 +3212,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns The result string of the edit.
      */
     public getResult(): string {
-        return this.query.edit.result;
+        return this.query?.edit?.result ?? "Unknown";
     }
 
     /**
@@ -3209,7 +3220,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns The page ID.
      */
     public getPageId(): number {
-        return this.query.edit.pageid;
+        return this.query.edit.pageid ?? 0;
     }
 
     /**
@@ -3217,7 +3228,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns The page title.
      */
     public getTitle(): string {
-        return this.query.edit.title;
+        return this.query.edit.title ?? "";
     }
 
     /**
@@ -3225,7 +3236,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns The content model string.
      */
     public getContentModel(): string {
-        return this.query.edit.contentmodel;
+        return this.query.edit.contentmodel ?? "";
     }
 
     /**
@@ -3233,7 +3244,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns The old revision ID.
      */
     public getOldRevisionId(): number {
-        return this.query.edit.oldrevid;
+        return this.query.edit.oldrevid ?? 0;
     }
 
     /**
@@ -3241,7 +3252,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns The new revision ID.
      */
     public getNewRevisionId(): number {
-        return this.query.edit.newrevid;
+        return this.query.edit.newrevid ?? 0;
     }
 
     /**
@@ -3250,7 +3261,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns The new timestamp string.
      */
     public getNewTimestamp(): string {
-        return this.query.edit.newtimestamp;
+        return this.query.edit.newtimestamp ?? "";
     }
 
     /**
@@ -3258,7 +3269,7 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
      * @returns `true` if the page is watched, `false` otherwise.
      */
     public isWatched(): boolean {
-        return this.query.edit.watched;
+        return this.query.edit.watched ?? false;
     }
 
     /**
@@ -3719,9 +3730,11 @@ export class MediaWiki {
      */
     public getSiteName(): string | null {
         this.assertSiteInfo();
-        return this.siteInfo?.general?.sitename ?? null;
+        if (this.siteInfo && this.siteInfo.general && typeof this.siteInfo.general.sitename === 'string') {
+            return this.siteInfo.general.sitename;
+        }
+        return null;
     }
-
 
     /**
      * Gets the list of namespaces from the loaded site info.
@@ -3731,7 +3744,10 @@ export class MediaWiki {
      */
     public getNamespaceList(): Record<string, any> | null {
         this.assertSiteInfo();
-        return this.siteInfo?.namespaces ?? null;
+        if (this.siteInfo && this.siteInfo.namespaces) {
+            return this.siteInfo.namespaces;
+        }
+        return null;
     }
 
     /**
@@ -3742,9 +3758,17 @@ export class MediaWiki {
      */
     public getNamespaceArray(): { id: number, name: string }[] {
         this.assertSiteInfo();
-        if (!this.siteInfo?.namespaces) return [];
+        const namespaces = this.siteInfo.namespaces;
 
-        return Object.entries(this.siteInfo.namespaces).map(([id, ns]: [string, any]) => ({
+        if (namespaces === undefined || namespaces === null) {
+            return [];
+        }
+
+        if (typeof namespaces !== 'object') {
+            return [];
+        }
+
+        return Object.entries(namespaces).map(([id, ns]: [string, any]) => ({
             id: parseInt(id, 10),
             name: ns["*"]
         }));
@@ -4004,22 +4028,30 @@ export class MediaWiki {
                 throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
             }
 
-            const query: MediaWikiPageOptions = {
+            const resQuery: MediaWikiPageOptions = {
                 titles: [options.title],
                 prop: ["categories"]
             };
 
-            const res = await this.client.query(query);
+            const res = await this.client.query(resQuery);
 
-            if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                return res as unknown as MediaWikiQueryCategoriesResponse;
+            if (!res || !res.query || typeof res.query.pages !== "object") {
+                return {
+                    continue: res.continue ?? {} as MediaWikiComprehensiveContinueBlock,
+                    query: {
+                        normalized: [],
+                        pages: []
+                    }
+                };
             }
 
             const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQueryCategoriesItem[];
+            const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
+
             return {
                 continue: res.continue as MediaWikiComprehensiveContinueBlock,
                 query: {
-                    normalized: res.query.normalized ?? [],
+                    normalized: normalizedArr,
                     pages: pagesArr
                 }
             };
@@ -4043,15 +4075,22 @@ export class MediaWiki {
             };
 
             const res = await this.client.query(query);
-            if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                return res as unknown as MediaWikiQueryRevisionsResponse;
+            if (!res || !res.query || typeof res.query.pages !== "object") {
+                return {
+                    batchcomplete: false,
+                    query: {
+                        normalized: [],
+                        pages: []
+                    }
+                };
             }
 
-            const pagesArr = Object.values(res.query.pages) as MediaWikiQueryRevisionsItem[];
+            const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQueryRevisionsItem[];
+            const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
             return {
-                batchcomplete: res.batchcomplete,
+                batchcomplete: res.batchcomplete ?? false,
                 query: {
-                    normalized: res.query.normalized,
+                    normalized: normalizedArr,
                     pages: pagesArr
                 }
             };
@@ -4077,19 +4116,30 @@ export class MediaWiki {
 
             const res = await this.client.query(query);
 
-            if (!res || !res.query) {
-                return new MediaWikiQuerySummaryResponseClass(res as unknown as MediaWikiQuerySummaryResponse);
+            if (!res) {
+                return new MediaWikiQuerySummaryResponseClass({
+                    batchcomplete: false,
+                    query: { pages: [], normalized: [] }
+                });
             }
 
             if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                return new MediaWikiQuerySummaryResponseClass(res as unknown as MediaWikiQuerySummaryResponse);
+                return new MediaWikiQuerySummaryResponseClass({
+                    batchcomplete: res.batchcomplete ?? false,
+                    query: {
+                        pages: (res.query?.pages && typeof res.query.pages === 'object' ? Object.values(res.query.pages) : []) as MediaWikiQuerySummaryItem[],
+                        normalized: res.query?.normalized ?? []
+                    },
+                    warnings: res.warnings,
+                    errors: res.errors
+                });
             }
 
             const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQuerySummaryItem[];
             return new MediaWikiQuerySummaryResponseClass({
                 batchcomplete: res.batchcomplete,
                 query: {
-                    normalized: res.query.normalized,
+                    normalized: res.query.normalized ?? [],
                     pages: pagesArr
                 }
             });
@@ -4106,8 +4156,36 @@ export class MediaWiki {
             };
 
             const res = await this.client.query(query);
-            if (!res || !res.query) {
-                return new MediaWikiQueryUserInfoResponseClass(res as unknown as MediaWikiQueryUserInfoResponseClass);
+
+            if (!res) {
+                return new MediaWikiQueryUserInfoResponseClass({
+                    batchcomplete: false,
+                    query: {
+                        userinfo: {
+                            id: -1,
+                            name: "",
+                            groups: [],
+                            groupmemberships: [],
+                            implicitgroups: [],
+                            rights: [],
+                            changeablegroups: { add: [], remove: [], "add-self": [], "remove-self": [] },
+                            options: {} as MediaWikiQueryUserInfoOptions,
+                            editcount: -1,
+                            ratelimits: {}
+                        }
+                    }
+                });
+            }
+
+            if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
+                return new MediaWikiQueryUserInfoResponseClass({
+                    batchcomplete: res.batchcomplete ?? false,
+                    query: {
+                        userinfo: res.query?.userinfo as MediaWikiQueryUserInfoDetails,
+                    },
+                    warnings: res.warnings,
+                    errors: res.errors
+                });
             }
 
             return new MediaWikiQueryUserInfoResponseClass(res as MediaWikiQueryUserInfoResponseClass);

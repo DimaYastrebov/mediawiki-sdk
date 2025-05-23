@@ -1,4 +1,4 @@
-import { CookieStore } from "./cookie-store.js";
+import { CookieStore } from "./cookie-store";
 export class MediaWikiQueryPageResponseClass {
     constructor(data, wikiInstance) {
         this.batchcomplete = data.batchcomplete;
@@ -277,12 +277,24 @@ export class MediaWikiQueryEditPageResponseClass {
      * @param data The raw response object from the MediaWiki API's edit query.
      */
     constructor(data) {
-        this.batchcomplete = data.batchcomplete;
-        this.query = data.query;
-        if (data.warnings)
-            this.warnings = data.warnings;
-        if (data.errors)
-            this.errors = data.errors;
+        const defaultEditDetails = {
+            result: "Unknown", pageid: 0, title: "", contentmodel: "wikitext",
+            oldrevid: 0, newrevid: 0, newtimestamp: "", watched: false
+        };
+        if (data && typeof data === 'object') {
+            this.batchcomplete = data.batchcomplete ?? false;
+            this.query = data.query ?? { edit: defaultEditDetails };
+            if (!this.query.edit)
+                this.query.edit = defaultEditDetails;
+            if (data.warnings)
+                this.warnings = data.warnings;
+            if (data.errors)
+                this.errors = data.errors;
+        }
+        else {
+            this.batchcomplete = false;
+            this.query = { edit: defaultEditDetails };
+        }
     }
     /**
      * Retrieves the result status of the edit operation.
@@ -290,42 +302,42 @@ export class MediaWikiQueryEditPageResponseClass {
      * @returns The result string of the edit.
      */
     getResult() {
-        return this.query.edit.result;
+        return this.query?.edit?.result ?? "Unknown";
     }
     /**
      * Retrieves the unique identifier of the page that was edited.
      * @returns The page ID.
      */
     getPageId() {
-        return this.query.edit.pageid;
+        return this.query.edit.pageid ?? 0;
     }
     /**
      * Retrieves the canonical title of the page that was edited.
      * @returns The page title.
      */
     getTitle() {
-        return this.query.edit.title;
+        return this.query.edit.title ?? "";
     }
     /**
      * Retrieves the content model of the edited page (e.g., 'wikitext').
      * @returns The content model string.
      */
     getContentModel() {
-        return this.query.edit.contentmodel;
+        return this.query.edit.contentmodel ?? "";
     }
     /**
      * Retrieves the revision ID of the page *before* the current edit.
      * @returns The old revision ID.
      */
     getOldRevisionId() {
-        return this.query.edit.oldrevid;
+        return this.query.edit.oldrevid ?? 0;
     }
     /**
      * Retrieves the revision ID of the *new* version of the page after the edit.
      * @returns The new revision ID.
      */
     getNewRevisionId() {
-        return this.query.edit.newrevid;
+        return this.query.edit.newrevid ?? 0;
     }
     /**
      * Retrieves the timestamp of the new revision in ISO 8601 format.
@@ -333,14 +345,14 @@ export class MediaWikiQueryEditPageResponseClass {
      * @returns The new timestamp string.
      */
     getNewTimestamp() {
-        return this.query.edit.newtimestamp;
+        return this.query.edit.newtimestamp ?? "";
     }
     /**
      * Checks if the edited page is currently on the user's watchlist.
      * @returns `true` if the page is watched, `false` otherwise.
      */
     isWatched() {
-        return this.query.edit.watched;
+        return this.query.edit.watched ?? false;
     }
     /**
      * Checks if the API response contains any warnings.
@@ -639,19 +651,26 @@ export class MediaWiki {
                 if (!options || !options.title) {
                     throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
                 }
-                const query = {
+                const resQuery = {
                     titles: [options.title],
                     prop: ["categories"]
                 };
-                const res = await this.client.query(query);
-                if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                    return res;
+                const res = await this.client.query(resQuery);
+                if (!res || !res.query || typeof res.query.pages !== "object") {
+                    return {
+                        continue: res.continue ?? {},
+                        query: {
+                            normalized: [],
+                            pages: []
+                        }
+                    };
                 }
                 const pagesArr = Object.values(res.query.pages ?? {});
+                const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
                 return {
                     continue: res.continue,
                     query: {
-                        normalized: res.query.normalized ?? [],
+                        normalized: normalizedArr,
                         pages: pagesArr
                     }
                 };
@@ -672,14 +691,21 @@ export class MediaWiki {
                     rvlimit: options.rvlimit
                 };
                 const res = await this.client.query(query);
-                if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                    return res;
+                if (!res || !res.query || typeof res.query.pages !== "object") {
+                    return {
+                        batchcomplete: false,
+                        query: {
+                            normalized: [],
+                            pages: []
+                        }
+                    };
                 }
-                const pagesArr = Object.values(res.query.pages);
+                const pagesArr = Object.values(res.query.pages ?? {});
+                const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
                 return {
-                    batchcomplete: res.batchcomplete,
+                    batchcomplete: res.batchcomplete ?? false,
                     query: {
-                        normalized: res.query.normalized,
+                        normalized: normalizedArr,
                         pages: pagesArr
                     }
                 };
@@ -701,17 +727,28 @@ export class MediaWiki {
                     explaintext: true
                 };
                 const res = await this.client.query(query);
-                if (!res || !res.query) {
-                    return new MediaWikiQuerySummaryResponseClass(res);
+                if (!res) {
+                    return new MediaWikiQuerySummaryResponseClass({
+                        batchcomplete: false,
+                        query: { pages: [], normalized: [] }
+                    });
                 }
                 if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                    return new MediaWikiQuerySummaryResponseClass(res);
+                    return new MediaWikiQuerySummaryResponseClass({
+                        batchcomplete: res.batchcomplete ?? false,
+                        query: {
+                            pages: (res.query?.pages && typeof res.query.pages === 'object' ? Object.values(res.query.pages) : []),
+                            normalized: res.query?.normalized ?? []
+                        },
+                        warnings: res.warnings,
+                        errors: res.errors
+                    });
                 }
                 const pagesArr = Object.values(res.query.pages ?? {});
                 return new MediaWikiQuerySummaryResponseClass({
                     batchcomplete: res.batchcomplete,
                     query: {
-                        normalized: res.query.normalized,
+                        normalized: res.query.normalized ?? [],
                         pages: pagesArr
                     }
                 });
@@ -726,8 +763,34 @@ export class MediaWiki {
                     uiprop: "*"
                 };
                 const res = await this.client.query(query);
-                if (!res || !res.query) {
-                    return new MediaWikiQueryUserInfoResponseClass(res);
+                if (!res) {
+                    return new MediaWikiQueryUserInfoResponseClass({
+                        batchcomplete: false,
+                        query: {
+                            userinfo: {
+                                id: -1,
+                                name: "",
+                                groups: [],
+                                groupmemberships: [],
+                                implicitgroups: [],
+                                rights: [],
+                                changeablegroups: { add: [], remove: [], "add-self": [], "remove-self": [] },
+                                options: {},
+                                editcount: -1,
+                                ratelimits: {}
+                            }
+                        }
+                    });
+                }
+                if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
+                    return new MediaWikiQueryUserInfoResponseClass({
+                        batchcomplete: res.batchcomplete ?? false,
+                        query: {
+                            userinfo: res.query?.userinfo,
+                        },
+                        warnings: res.warnings,
+                        errors: res.errors
+                    });
                 }
                 return new MediaWikiQueryUserInfoResponseClass(res);
             },
@@ -1091,7 +1154,10 @@ export class MediaWiki {
      */
     getSiteName() {
         this.assertSiteInfo();
-        return this.siteInfo?.general?.sitename ?? null;
+        if (this.siteInfo && this.siteInfo.general && typeof this.siteInfo.general.sitename === 'string') {
+            return this.siteInfo.general.sitename;
+        }
+        return null;
     }
     /**
      * Gets the list of namespaces from the loaded site info.
@@ -1101,7 +1167,10 @@ export class MediaWiki {
      */
     getNamespaceList() {
         this.assertSiteInfo();
-        return this.siteInfo?.namespaces ?? null;
+        if (this.siteInfo && this.siteInfo.namespaces) {
+            return this.siteInfo.namespaces;
+        }
+        return null;
     }
     /**
      * Returns an array of namespaces with their IDs and names.
@@ -1111,9 +1180,14 @@ export class MediaWiki {
      */
     getNamespaceArray() {
         this.assertSiteInfo();
-        if (!this.siteInfo?.namespaces)
+        const namespaces = this.siteInfo.namespaces;
+        if (namespaces === undefined || namespaces === null) {
             return [];
-        return Object.entries(this.siteInfo.namespaces).map(([id, ns]) => ({
+        }
+        if (typeof namespaces !== 'object') {
+            return [];
+        }
+        return Object.entries(namespaces).map(([id, ns]) => ({
             id: parseInt(id, 10),
             name: ns["*"]
         }));

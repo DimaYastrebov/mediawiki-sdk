@@ -1,4 +1,4 @@
-import { Cookie } from "./cookie-store.js";
+import { Cookie } from "./cookie-store";
 /**
  * Possible output formats for the MediaWiki API.
  */
@@ -2520,9 +2520,9 @@ export interface MediaWikiQueryTokensDetails {
  */
 export interface MediaWikiQueryEditPageDetails {
     /**
-     * The result of the edit operation. For a successful edit, this will always be "Success".
+     * The result of the edit operation. For a successful edit.
      */
-    result: "Success";
+    result: string;
     /** The unique identifier of the page that was edited. */
     pageid: number;
     /** The canonical title of the page that was edited. */
@@ -2880,7 +2880,7 @@ export declare class MediaWikiQueryEditPageResponseClass implements MediaWikiQue
      * Constructs an instance of `MediaWikiQueryEditPageResponseClass`.
      * @param data The raw response object from the MediaWiki API's edit query.
      */
-    constructor(data: MediaWikiQueryEditPageResponse);
+    constructor(data: MediaWikiQueryEditPageResponse | null | undefined);
     /**
      * Retrieves the result status of the edit operation.
      * For a successful edit, this will be "Success".
