@@ -1,7 +1,7 @@
 {
   "type": "commonjs",
   "name": "mediawiki-sdk",
-  "version": "0.5.23",
+  "version": "0.6.0",
   "description": "TypeScript SDK for generating and working with WikiText and MediaWiki API. Allows to get pages from wiki projects built on mediawiki.",
   "author": "DimaYastrebov",
   "license": "ISC",

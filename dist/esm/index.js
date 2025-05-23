@@ -779,6 +779,17 @@ export class MediaWiki {
                 }
                 return new MediaWikiQueryEditPageResponseClass(res);
             },
+            random: async () => {
+                const query = {
+                    action: "query",
+                    list: ["random"]
+                };
+                const res = await this.client.query(query);
+                if (!res || !res.query) {
+                    return res;
+                }
+                return res;
+            }
         };
         if (!options.baseURL) {
             throw new Error("baseURL is required");

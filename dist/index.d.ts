@@ -2947,6 +2947,17 @@ export declare class MediaWikiQueryEditPageResponseClass implements MediaWikiQue
      */
     getErrors(): any;
 }
+export interface MediaWikiQueryRandomResponse extends MediaWikiBaseResponse {
+    /**
+     * The main query object containing the specific data requested.
+     */
+    query: {
+        /**
+         * An array of random page titles.
+         */
+        random: MediaWikiListRandomItem[];
+    };
+}
 /**
  * Custom error class for MediaWiki API-specific errors.
  * This class extends the standard `Error` and provides additional properties
@@ -3233,5 +3244,6 @@ export declare class MediaWiki {
          * @throws If required parameters are missing.
          */
         editPage: (options: MediaWikiQueryEditPageOptions) => Promise<MediaWikiQueryEditPageResponseClass>;
+        random: () => Promise<MediaWikiQueryRandomResponse>;
     };
 }

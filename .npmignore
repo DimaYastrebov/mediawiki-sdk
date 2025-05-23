@@ -5,3 +5,5 @@ src/
 tsconfig.json
 
 index.js
+
+__tests__

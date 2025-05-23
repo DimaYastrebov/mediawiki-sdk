@@ -3297,6 +3297,18 @@ export class MediaWikiQueryEditPageResponseClass implements MediaWikiQueryEditPa
     }
 }
 
+export interface MediaWikiQueryRandomResponse extends MediaWikiBaseResponse {
+    /**
+     * The main query object containing the specific data requested.
+     */
+    query: {
+        /**
+         * An array of random page titles.
+         */
+        random: MediaWikiListRandomItem[];
+    };
+}
+
 /**
  * Custom error class for MediaWiki API-specific errors.
  * This class extends the standard `Error` and provides additional properties
@@ -4121,6 +4133,8 @@ export class MediaWiki {
             return new MediaWikiQueryTokensResponseClass(res as MediaWikiQueryTokensResponseClass);
         },
 
+
+
         /**
          * Edits a page by providing 'title' or 'pageid' and new 'text'.
          * Requires a CSRF token.
@@ -4159,5 +4173,19 @@ export class MediaWiki {
 
             return new MediaWikiQueryEditPageResponseClass(res as MediaWikiQueryEditPageResponseClass);
         },
+
+        random: async (): Promise<MediaWikiQueryRandomResponse> => {
+            const query: MediaWikiPageOptions = {
+                action: "query",
+                list: ["random"]
+            };
+
+            const res = await this.client.query(query);
+            if (!res || !res.query) {
+                return res as unknown as MediaWikiQueryRandomResponse;
+            }
+
+            return res as MediaWikiQueryRandomResponse;
+        }
     }
 }
