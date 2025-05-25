@@ -1,4 +1,72 @@
-import { CookieStore } from "./cookie-store";
+export class CookieStore {
+    constructor() {
+        this.store = [];
+    }
+    parseSetCookie(setCookieHeader, originHost) {
+        const parts = setCookieHeader.split(";").map(p => p.trim());
+        const [name, value] = parts[0].split("=");
+        const cookie = {
+            name,
+            value,
+            domain: "",
+            path: "/",
+            creationTime: new Date(),
+        };
+        for (const attr of parts.slice(1)) {
+            const [k, v] = attr.includes("=") ? attr.split("=") : [attr, ""];
+            const key = k.toLowerCase();
+            switch (key) {
+                case "expires":
+                    const date = new Date(v);
+                    if (!isNaN(date.getTime()))
+                        cookie.expires = date;
+                    break;
+                case "path":
+                    cookie.path = v;
+                    break;
+                case "domain":
+                    cookie.domain = v.startsWith(".") ? v.slice(1) : v;
+                    break;
+                case "secure":
+                    cookie.secure = true;
+                    break;
+                case "httponly":
+                    cookie.httpOnly = true;
+                    break;
+                case "samesite":
+                    cookie.sameSite = v;
+                    break;
+            }
+        }
+        if (!cookie.domain) {
+            cookie.domain = originHost;
+            cookie.hostOnly = true;
+        }
+        this.storeCookie(cookie);
+    }
+    storeCookie(cookie) {
+        this.store = this.store.filter(c => !(c.name === cookie.name &&
+            c.domain === cookie.domain &&
+            c.path === cookie.path));
+        this.store.push(cookie);
+    }
+    getCookieHeader(url) {
+        const u = new URL(url);
+        const now = new Date();
+        const validCookies = this.store.filter(cookie => {
+            if (cookie.expires && cookie.expires < now)
+                return false;
+            if (cookie.secure && u.protocol !== "https:")
+                return false;
+            const domainMatch = cookie.hostOnly
+                ? u.hostname === cookie.domain
+                : u.hostname === cookie.domain || u.hostname.endsWith("." + cookie.domain);
+            const pathMatch = u.pathname.startsWith(cookie.path);
+            return domainMatch && pathMatch;
+        });
+        return validCookies;
+    }
+}
 export class MediaWikiQueryPageResponseClass {
     constructor(data, wikiInstance) {
         this.batchcomplete = data.batchcomplete;
@@ -387,6 +455,44 @@ export class MediaWikiQueryEditPageResponseClass {
     }
 }
 /**
+ * A utility class for handling and accessing the response from a MediaWiki file upload operation.
+ * Provides convenient methods to extract key details about the upload result.
+ */
+export class MediaWikiQueryUploadFileResponseClass {
+    constructor(data) {
+        this.batchcomplete = data?.batchcomplete ?? false;
+        this.upload = data?.upload;
+        this.error = data?.error;
+    }
+    getResult() {
+        return this.upload?.result ?? "Error";
+    }
+    getFilename() {
+        return this.upload?.filename ?? "";
+    }
+    getCanonicalTitle() {
+        return this.upload?.imageinfo.canonicaltitle ?? "";
+    }
+    getFileUrl() {
+        return this.upload?.imageinfo.url ?? "";
+    }
+    getDescriptionUrl() {
+        return this.upload?.imageinfo.descriptionurl ?? "";
+    }
+    getSha1() {
+        return this.upload?.imageinfo.sha1 ?? "";
+    }
+    getMime() {
+        return this.upload?.imageinfo.mime ?? "";
+    }
+    getMediaType() {
+        return this.upload?.imageinfo.mediatype ?? "";
+    }
+    getError() {
+        return this.error;
+    }
+}
+/**
  * Custom error class for MediaWiki API-specific errors.
  * This class extends the standard `Error` and provides additional properties
  * to better convey the nature of API failures, including HTTP status,
@@ -433,10 +539,29 @@ export class MediaWiki {
      * const client = new MediaWiki({ baseURL: "https://en.wikipedia.org/w/api.php" });
      */
     constructor(options) {
-        /**
-         * API client methods.
-         */
+        if (!options.baseURL) {
+            throw new Error("baseURL is required");
+        }
+        this.cookieStore = new CookieStore();
+        this.baseURL = options.baseURL.endsWith("/api.php") ? options.baseURL : `${options.baseURL}/api.php`;
+        this.params = {
+            servedby: options.servedby,
+            curtimestamp: options.curtimestamp,
+            responselanginfo: options.responselanginfo,
+            requestid: options.requestid,
+            format: options.format ?? "json",
+            formatversion: options.formatversion ?? 2,
+            ascii: options.ascii,
+            utf8: options.utf8
+        };
+        this.authorized = false;
+        this.siteInfo = null;
+        if (options.format && options.format !== "json") {
+            throw new Error(`Expected "json" format but got "${options.format}". The library only speaks JSON...`);
+        }
+        this.parent = this;
         this.client = {
+            parent: this.parent,
             /**
              * Executes a full MediaWiki API query with various combinations of prop, meta, and list options.
              *
@@ -453,7 +578,7 @@ export class MediaWiki {
              *   console.log(response);
              * });
              */
-            query: async (options) => {
+            async query(options) {
                 if (!options) {
                     throw new Error("Options are required for the query method.");
                 }
@@ -499,11 +624,11 @@ export class MediaWiki {
                     uiprop: options.uiprop,
                     type: options.type
                 };
-                const filteredParams = this.filterParams(queryParams);
-                return this.fetchData({
+                const filteredParams = this.parent.filterParams(queryParams);
+                return this.parent.fetchData({
                     method: "GET",
                     params: filteredParams,
-                    url: this.baseURL
+                    url: this.parent.baseURL
                 });
             },
             /**
@@ -518,7 +643,7 @@ export class MediaWiki {
              * mediaWiki.client.page(["Main Page"])
              *   .then(pageData => console.log(pageData));
              */
-            page: async (titles) => {
+            async page(titles) {
                 if (!titles || titles.length === 0) {
                     throw new Error("Missing or empty 'titles' - must be a non-empty.");
                 }
@@ -527,11 +652,11 @@ export class MediaWiki {
                     titles: titles,
                     indexpageids: true
                 };
-                const res = await this.client.query(query);
+                const res = await this.query(query);
                 if (!res || !res.query) {
-                    return new MediaWikiQueryPageResponseClass(res, this);
+                    return new MediaWikiQueryPageResponseClass(res, this.parent);
                 }
-                return new MediaWikiQueryPageResponseClass(res, this);
+                return new MediaWikiQueryPageResponseClass(res, this.parent);
             },
             /**
              * Searches the wiki using the 'search' list API.
@@ -540,7 +665,7 @@ export class MediaWiki {
              * @param srlimit - Optional number to limit the number of results (default 10).
              * @returns Promise resolving to the search results response.
              */
-            search: async (srsearch, srnamespace, srlimit) => {
+            async search(srsearch, srnamespace, srlimit) {
                 if (!srsearch || srsearch.trim() === "") {
                     throw new Error(`Missing "srsearch" - must be a non-empty string.`);
                 }
@@ -550,7 +675,7 @@ export class MediaWiki {
                     srnamespace: srnamespace ?? [],
                     srlimit: srlimit ?? 10
                 };
-                const res = await this.client.query(query);
+                const res = await this.parent.client.query(query);
                 if (!res || !res.query) {
                     return res;
                 }
@@ -573,13 +698,13 @@ export class MediaWiki {
              * getSiteDetails();
              * @see https://www.mediawiki.org/wiki/API:Siteinfo
              */
-            siteInfo: async () => {
+            async siteInfo() {
                 const query = {
                     meta: ["siteinfo"]
                 };
-                const res = await this.client.query(query);
-                this.siteInfo = res?.query ?? null;
-                if (!this.siteInfo || !this.siteInfo.general) {
+                const res = await this.query(query);
+                this.parent.siteInfo = res?.query ?? null;
+                if (!this.parent.siteInfo || !this.parent.siteInfo.general) {
                     return res;
                 }
                 return res;
@@ -590,7 +715,7 @@ export class MediaWiki {
             * @returns Promise resolving to OpenSearch formatted results.
             * @throws If options or search term is missing.
             */
-            opensearch: async (options) => {
+            async opensearch(options) {
                 if (!options) {
                     throw new Error("Options are required for the opensearch method.");
                 }
@@ -601,10 +726,10 @@ export class MediaWiki {
                     action: "opensearch",
                     ...options
                 };
-                const filteredParams = this.filterParams(query);
-                const res = await this.fetchData({
+                const filteredParams = this.parent.filterParams(query);
+                const res = await this.parent.fetchData({
                     method: "GET",
-                    url: this.baseURL,
+                    url: this.parent.baseURL,
                     params: filteredParams
                 });
                 if (!res || !res.query) {
@@ -619,7 +744,7 @@ export class MediaWiki {
              * @returns Promise resolving to the parsed content response class instance.
              * @throws If required parameters are missing.
              */
-            parse: async (options) => {
+            async parse(options) {
                 if (!options) {
                     throw new Error(`Options are required for the parse method.`);
                 }
@@ -630,10 +755,10 @@ export class MediaWiki {
                     action: "parse",
                     ...options
                 };
-                const filteredParams = this.filterParams(query);
-                const res = await this.fetchData({
+                const filteredParams = this.parent.filterParams(query);
+                const res = await this.parent.fetchData({
                     method: "GET",
-                    url: this.baseURL,
+                    url: this.parent.baseURL,
                     params: filteredParams
                 });
                 if (!res || !res.parse) {
@@ -647,7 +772,7 @@ export class MediaWiki {
              * @returns Promise resolving to categories response.
              * @throws If 'title' is missing or invalid.
              */
-            categories: async (options) => {
+            async categories(options) {
                 if (!options || !options.title) {
                     throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
                 }
@@ -655,7 +780,7 @@ export class MediaWiki {
                     titles: [options.title],
                     prop: ["categories"]
                 };
-                const res = await this.client.query(resQuery);
+                const res = await this.query(resQuery);
                 if (!res || !res.query || typeof res.query.pages !== "object") {
                     return {
                         continue: res.continue ?? {},
@@ -681,7 +806,7 @@ export class MediaWiki {
              * @returns Promise resolving to revisions response.
              * @throws If 'title' is missing or invalid.
              */
-            revisions: async (options) => {
+            async revisions(options) {
                 if (!options || !options.title) {
                     throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
                 }
@@ -690,7 +815,7 @@ export class MediaWiki {
                     prop: ["revisions"],
                     rvlimit: options.rvlimit
                 };
-                const res = await this.client.query(query);
+                const res = await this.parent.client.query(query);
                 if (!res || !res.query || typeof res.query.pages !== "object") {
                     return {
                         batchcomplete: false,
@@ -716,7 +841,7 @@ export class MediaWiki {
              * @returns Promise resolving to a summary response class instance.
              * @throws If 'title' is missing or invalid.
              */
-            summary: async (options) => {
+            async summary(options) {
                 if (!options || !options.title) {
                     throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
                 }
@@ -726,7 +851,7 @@ export class MediaWiki {
                     exintro: true,
                     explaintext: true
                 };
-                const res = await this.client.query(query);
+                const res = await this.query(query);
                 if (!res) {
                     return new MediaWikiQuerySummaryResponseClass({
                         batchcomplete: false,
@@ -757,12 +882,12 @@ export class MediaWiki {
              * Retrieves information about the current user.
              * @returns Promise resolving to user info response class instance.
              */
-            userInfo: async () => {
+            async userInfo() {
                 const query = {
                     meta: ["userinfo"],
                     uiprop: "*"
                 };
-                const res = await this.client.query(query);
+                const res = await this.query(query);
                 if (!res) {
                     return new MediaWikiQueryUserInfoResponseClass({
                         batchcomplete: false,
@@ -799,12 +924,12 @@ export class MediaWiki {
              * @param options - Object with 'type' specifying token types to fetch.
              * @returns Promise resolving to tokens response class instance.
              */
-            getToken: async (options) => {
+            async getToken(options) {
                 const query = {
                     meta: ["tokens"],
                     type: options.type.join("|")
                 };
-                const res = await this.client.query(query);
+                const res = await this.query(query);
                 if (!res || !res.query || !res.query.tokens) {
                     throw new Error(`Failed to retrieve tokens or unexpected response structure: ${JSON.stringify(res)}`);
                 }
@@ -817,63 +942,158 @@ export class MediaWiki {
              * @returns Promise resolving to the edit page response class instance.
              * @throws If required parameters are missing.
              */
-            editPage: async (options) => {
+            async editPage(options) {
                 if (!options) {
                     throw new Error("Options are required for the editpage method.");
                 }
                 if (!options.title && !options.pageid && !options.text) {
                     throw new Error(`You must provide either "page", "pageid" or "text" for the editpage method.`);
                 }
-                const csrfResponse = await this.client.getToken({ type: ["csrf"] });
+                const csrfResponse = await this.getToken({ type: ["csrf"] });
                 const query = {
                     token: csrfResponse.query.tokens.csrftoken,
                     action: "edit",
                     ...options
                 };
-                const filteredParams = this.filterParams(query);
-                const res = await this.fetchData({
+                const filteredParams = this.parent.filterParams(query);
+                const res = await this.parent.fetchData({
                     method: "POST",
-                    url: this.baseURL,
+                    url: this.parent.baseURL,
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    data: this.formURLEncoder(filteredParams)
+                    data: this.parent.formURLEncoder(filteredParams)
                 });
                 if (!res || !res.query) {
                     return new MediaWikiQueryEditPageResponseClass(res);
                 }
                 return new MediaWikiQueryEditPageResponseClass(res);
             },
-            random: async () => {
+            async random() {
                 const query = {
                     action: "query",
                     list: ["random"]
                 };
-                const res = await this.client.query(query);
+                const res = await this.query(query);
                 if (!res || !res.query) {
                     return res;
                 }
                 return res;
+            },
+            /**
+             * Uploads a file to MediaWiki.
+             * @param options - Options for the file upload.
+             * @returns Promise resolving to an instance of MediaWikiQueryUploadFileResponseClass.
+             * @throws {Error} If required parameters are missing or an error occurs during upload.
+             */
+            async uploadFile(options) {
+                if (!options) {
+                    throw new Error("The 'options' parameter is required for uploadFile.");
+                }
+                if (!options.filekey && !options.filename) {
+                    throw new Error("The 'filename' parameter is required if 'filekey' is not provided.");
+                }
+                if (!options.file && !options.url && !options.filekey) {
+                    throw new Error("A file source must be provided: 'file', 'url', or 'filekey'.");
+                }
+                if (options.file && !options.mimeType && options.file instanceof Buffer) {
+                    console.warn("It's recommended to specify 'mimeType' when 'file' is a Buffer. Defaulting to 'application/octet-stream'.");
+                }
+                const tokenResponse = await this.getToken({ type: ["csrf"] });
+                const csrfToken = tokenResponse.getCsrfToken();
+                if (!csrfToken) {
+                    throw new Error("Failed to obtain CSRF token for file upload.");
+                }
+                const formData = new FormData();
+                formData.append("action", "upload");
+                formData.append("token", csrfToken);
+                formData.append("format", this.parent.params.format ?? "json");
+                if (this.parent.params.formatversion) {
+                    formData.append("formatversion", String(this.parent.params.formatversion));
+                }
+                if (options.filename)
+                    formData.append("filename", options.filename);
+                if (options.comment)
+                    formData.append("comment", options.comment);
+                if (options.text)
+                    formData.append("text", options.text);
+                if (options.tags)
+                    formData.append("tags", options.tags);
+                if (options.watchlist)
+                    formData.append("watchlist", options.watchlist);
+                if (options.ignorewarnings !== undefined)
+                    formData.append("ignorewarnings", options.ignorewarnings ? "1" : "0");
+                if (options.async !== undefined)
+                    formData.append("async", options.async ? "1" : "0");
+                if (options.bot !== undefined)
+                    formData.append("bot", options.bot ? "1" : "0");
+                if (options.file) {
+                    let fileData;
+                    let partFilename = options.filename || "upload.dat";
+                    if (options.file instanceof Buffer) {
+                        fileData = new Blob([options.file], { type: options.mimeType || 'application/octet-stream' });
+                    }
+                    else if (typeof options.file.pipe === 'function' && typeof options.file.on === 'function') {
+                        throw new Error("Direct upload of ReadableStream is not supported. Convert to Buffer or Blob, or use 'url' or 'filekey'.");
+                    }
+                    else {
+                        fileData = options.file;
+                        if (options.file instanceof File && options.file.name) {
+                            partFilename = options.file.name;
+                        }
+                    }
+                    formData.append("file", fileData, partFilename);
+                }
+                else if (options.url) {
+                    formData.append("url", options.url);
+                }
+                else if (options.filekey) {
+                    formData.append("filekey", options.filekey);
+                }
+                const responseData = await this.parent.fetchData({
+                    method: "POST",
+                    url: this.parent.baseURL,
+                    data: formData
+                });
+                return new MediaWikiQueryUploadFileResponseClass(responseData);
+            },
+            async searchTitles(options) {
+                const { query, limit, namespace } = options;
+                if (!query || query.trim() === "") {
+                    throw new Error("Search query cannot be empty.");
+                }
+                const queryParams = {
+                    action: "query",
+                    list: ["search"],
+                    srsearch: query,
+                    srlimit: limit,
+                    srprop: ["titlesnippet"]
+                };
+                if (namespace !== undefined) {
+                    if (Array.isArray(namespace)) {
+                        queryParams.srnamespace = namespace.map(ns => String(ns));
+                    }
+                    else {
+                        queryParams.srnamespace = [String(namespace)];
+                    }
+                }
+                try {
+                    const response = await this.query(queryParams);
+                    if (response.query && response.query.search) {
+                        return response.query.search.map((item) => item.title);
+                    }
+                    return [];
+                }
+                catch (error) {
+                    console.error(`Error in searchTitles for query "${query}":`, error);
+                    throw error;
+                }
             }
         };
-        if (!options.baseURL) {
-            throw new Error("baseURL is required");
-        }
-        this.cookieStore = new CookieStore();
-        this.baseURL = options.baseURL.endsWith("/api.php") ? options.baseURL : `${options.baseURL}/api.php`;
-        this.params = {
-            servedby: options.servedby,
-            curtimestamp: options.curtimestamp,
-            responselanginfo: options.responselanginfo,
-            requestid: options.requestid,
-            format: options.format ?? "json",
-            formatversion: options.formatversion ?? 2,
-            ascii: options.ascii,
-            utf8: options.utf8
-        };
-        this.authorized = false;
-        this.siteInfo = null;
-        if (options.format && options.format !== "json") {
-            throw new Error(`Expected "json" format but got "${options.format}". The library only speaks JSON...`);
-        }
+        Object.defineProperty(this.client, 'parent', {
+            value: this.parent,
+            writable: false,
+            enumerable: false,
+            configurable: false
+        });
     }
     /**
      * Fetches data from the MediaWiki API endpoint.
@@ -907,14 +1127,28 @@ export class MediaWiki {
                 const cookieString = cookieObjects.map(cookie => `${cookie.name}=${cookie.value}`).join("; ");
                 headers["Cookie"] = cookieString;
             }
+            let bodyToSend = undefined;
+            if (options.method !== "GET" && options.data) {
+                if (options.data instanceof FormData ||
+                    typeof options.data === 'string' ||
+                    options.data instanceof URLSearchParams ||
+                    options.data instanceof ReadableStream) {
+                    bodyToSend = options.data;
+                }
+                else {
+                    bodyToSend = JSON.stringify(options.data);
+                    if (options.headers && !options.headers['Content-Type'] && !options.headers['content-type']) {
+                        options.headers['Content-Type'] = 'application/json';
+                    }
+                    else if (!options.headers) {
+                        options.headers = { 'Content-Type': 'application/json' };
+                    }
+                }
+            }
             const res = await fetch(urlObj.toString(), {
                 method: options.method,
                 headers,
-                body: options.method !== "GET" && options.data
-                    ? typeof options.data === "string"
-                        ? options.data
-                        : JSON.stringify(options.data)
-                    : undefined,
+                body: bodyToSend
             });
             const setCookie = res.headers.getSetCookie?.() || res.headers.get?.("set-cookie");
             if (setCookie) {

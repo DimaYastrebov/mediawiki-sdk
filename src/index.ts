@@ -1,4 +1,95 @@
-import { Cookie, CookieStore } from "./cookie-store";
+export interface Cookie {
+  name: string
+  value: string
+  domain: string
+  path: string
+  expires?: Date
+  secure?: boolean
+  httpOnly?: boolean
+  sameSite?: "Strict" | "Lax" | "None"
+  hostOnly?: boolean
+  creationTime: Date
+}
+
+export class CookieStore {
+  private store: Cookie[] = []
+
+  parseSetCookie(setCookieHeader: string, originHost: string) {
+    const parts = setCookieHeader.split(";").map(p => p.trim())
+    const [name, value] = parts[0].split("=")
+
+    const cookie: Cookie = {
+      name,
+      value,
+      domain: "",
+      path: "/",
+      creationTime: new Date(),
+    }
+
+    for (const attr of parts.slice(1)) {
+      const [k, v] = attr.includes("=") ? attr.split("=") : [attr, ""]
+      const key = k.toLowerCase()
+
+      switch (key) {
+        case "expires":
+          const date = new Date(v)
+          if (!isNaN(date.getTime())) cookie.expires = date
+          break
+        case "path":
+          cookie.path = v
+          break
+        case "domain":
+          cookie.domain = v.startsWith(".") ? v.slice(1) : v
+          break
+        case "secure":
+          cookie.secure = true
+          break
+        case "httponly":
+          cookie.httpOnly = true
+          break
+        case "samesite":
+          cookie.sameSite = v as any
+          break
+      }
+    }
+
+    if (!cookie.domain) {
+      cookie.domain = originHost
+      cookie.hostOnly = true
+    }
+
+    this.storeCookie(cookie)
+  }
+
+  private storeCookie(cookie: Cookie) {
+    this.store = this.store.filter(c =>
+      !(c.name === cookie.name &&
+        c.domain === cookie.domain &&
+        c.path === cookie.path)
+    )
+
+    this.store.push(cookie)
+  }
+
+  getCookieHeader(url: string): Cookie[] {
+    const u = new URL(url)
+    const now = new Date()
+
+    const validCookies = this.store.filter(cookie => {
+      if (cookie.expires && cookie.expires < now) return false
+      if (cookie.secure && u.protocol !== "https:") return false
+
+      const domainMatch = cookie.hostOnly
+        ? u.hostname === cookie.domain
+        : u.hostname === cookie.domain || u.hostname.endsWith("." + cookie.domain)
+
+      const pathMatch = u.pathname.startsWith(cookie.path)
+      return domainMatch && pathMatch
+    })
+
+    return validCookies;
+  }
+}
 
 /**
  * Possible output formats for the MediaWiki API.
@@ -29,6 +120,7 @@ export type MediaWikiPageOptionsList = "allcategories" | "alldeletedrevisions" |
 export type MediaWikiPageOptionsMeta = "allmessages" | "authmanagerinfo" | "filerepoinfo" | "languageinfo" | "languagestats" | "linterstats" | "managemessagegroups" | "messagegroups" | "messagegroupstats" | "messagetranslations" | "notifications" | "siteinfo" | "tokens" | "unreadnotificationpages" | "userinfo" | "oath";
 export type MediaWikiSearchOptions = "nearmatch" | "text" | "title";
 export type MediaWikiTokensOptions = "*" | "createaccount" | "csrf" | "login" | "patrol" | "rollback" | "userrights" | "watch";
+export type MediaWikiSearchSrPropOptions = | "categorysnippet" | "extensiondata" | "hasrelated" | "isfilematch" | "redirectsnippet" | "redirecttitle" | "score" | "sectionsnippet" | "sectiontitle" | "size" | "snippet" | "timestamp" | "titlesnippet" | "wordcount";
 
 /**
  * Options for initializing the MediaWiki client.
@@ -199,8 +291,8 @@ export interface MediaWikiPageOptions {
     explaintext?: boolean;
     uiprop?: string;
     type?: any;
-    srinfo?: string;
-    srprop?: string[];
+    srinfo?: "totalhits" | "suggestion" | "rewrittenquery";
+    srprop?: MediaWikiSearchSrPropOptions[];
 }
 
 export interface MediaWikiErrorCodeResponse {
@@ -757,6 +849,62 @@ export interface MediaWikiListSearchInfo {
     totalhits: number;
     suggestion?: string;
     suggestionsnippet?: string;
+}
+
+/**
+ * Represents a single metadata field returned from MediaWiki's `imageinfo.metadata`.
+ */
+export interface MediaWikiImageMetadata {
+    /**
+     * The internal name/key of the metadata field (e.g., "DateTimeOriginal", "Artist").
+     */
+    name: string;
+
+    /**
+     * The raw value of the metadata field (can be string, number, or even base64-encoded data).
+     */
+    value: string;
+
+    /**
+     * Optional human-readable label, if available (e.g., "Original date/time").
+     */
+    label?: string;
+
+    /**
+     * Optional human-readable value with formatting or localization.
+     */
+    formattedvalue?: string;
+
+    /**
+     * Optional source of the metadata (e.g., "exif", "iptc", "xmp").
+     */
+    source?: string;
+
+    /**
+     * Optional name of the metadata space (e.g., "EXIF", "IPTC").
+     */
+    space?: string;
+}
+
+/**
+ * Represents simplified metadata returned from `commonmetadata`.
+ * Typically includes width, height, resolution, and unit data.
+ */
+export interface MediaWikiSimpleMetadata {
+    /**
+     * Name of the metadata field (e.g., "ImageWidth", "XResolution").
+     */
+    name: string;
+
+    /**
+     * The value of the metadata field (e.g., "1920", "72").
+     */
+    value: string;
+
+    /**
+     * Optional source of the field (e.g., "exif").
+     */
+    source?: string;
 }
 
 /**
@@ -3320,6 +3468,313 @@ export interface MediaWikiQueryRandomResponse extends MediaWikiBaseResponse {
     };
 }
 
+export interface MediaWikiQueryUploadFileOptions {
+    /** 
+     * The name to assign to the uploaded file (i.e., the destination filename on the wiki). 
+     * This becomes the title of the File page. 
+     */
+    filename?: string;
+
+    /** 
+     * Optional text to include in the upload log and file description. 
+     * Often used as the initial page content. 
+     */
+    comment?: string;
+
+    /**
+     * Optional tags to apply to the upload action. 
+     * These are used for tagging the edit (e.g., 'api', 'upload', etc.). 
+     */
+    tags?: string;
+
+    /** 
+     * The text to use as the initial content of the file description page. 
+     * This is often used to provide context or information about the file. 
+     */
+    text?: string;
+
+    /** 
+     * The action to take regarding the file's watchlist status. 
+     * Can be 'preferences' (default), 'nochange', 'watch', or 'unwatch'. 
+     */
+    watchlist?: "preferences" | "nochange" | "watch" | "unwatch";
+
+    /** 
+     * Whether to ignore warnings during upload (e.g., overwriting an existing file). 
+     * If set to true, the upload proceeds despite any warnings. 
+     */
+    ignorewarnings?: boolean;
+
+    /** 
+     * The file content to upload. 
+     * Must be a Buffer (for in-memory files) or a ReadableStream (e.g., from fs.createReadStream). 
+     * This is required unless using a previously uploaded file via `filekey` or uploading by `url`. 
+     */
+    file?: Buffer | ReadableStream;
+
+    /** 
+     * A URL to fetch the file from for uploading. 
+     * Used when uploading from a remote source instead of sending the file directly. 
+     */
+    url?: string;
+
+    /** 
+     * A file key returned from a previous upload step (used in stash-based uploads). 
+     * This allows continuing a previously started upload. 
+     */
+    filekey?: string;
+
+    /** 
+     * Whether the upload should be handled asynchronously. 
+     * Useful for large files or for background processing. 
+     */
+    async?: boolean;
+
+    /** 
+     * Whether to mark the upload as a bot edit. 
+     * Only has an effect if the user is flagged as a bot. 
+     */
+    bot?: boolean;
+
+    /** 
+     * The MIME type of the uploaded file (e.g., 'image/png', 'application/pdf'). 
+     * Required when using the `file` parameter to upload. 
+     */
+    mimeType?: string;
+}
+
+/**
+ * Interface representing the response from a MediaWiki API file upload request.
+ */
+export interface MediaWikiQueryUploadFileResponse extends MediaWikiBaseResponse {
+    /**
+     * Contains upload result details, only present if the upload succeeded or partially succeeded.
+     */
+    upload?: {
+        warnings: string[];
+        /**
+         * Upload result status.
+         * 
+         * - `Success`: Upload completed successfully.
+         * - `Warning`: Upload completed with a warning (e.g., file already exists).
+         * - `Error`: Upload failed (details should be in `error`).
+         */
+        result: "Success" | "Warning" | "Error";
+
+        /**
+         * The name of the uploaded file, which may differ from the original filename
+         * if the server renamed it (e.g., due to conflicts).
+         */
+        filename: string;
+
+        /**
+         * Detailed metadata and information about the uploaded image.
+         */
+        imageinfo: {
+            /**
+             * ISO 8601 formatted upload timestamp (e.g., "2025-05-25T02:28:36Z").
+             */
+            timestamp: string;
+
+            /**
+             * Username of the user who uploaded the file.
+             */
+            user: string;
+
+            /**
+             * User ID of the uploader.
+             */
+            userid: number;
+
+            /**
+             * Total size of the uploaded file in bytes.
+             */
+            size: number;
+
+            /**
+             * Width of the uploaded image in pixels.
+             */
+            width: number;
+
+            /**
+             * Height of the uploaded image in pixels.
+             */
+            height: number;
+
+            /**
+             * The comment provided by the uploader, after being parsed/cleaned by the server.
+             */
+            parsedcomment: string;
+
+            /**
+             * The raw, unparsed comment provided during upload.
+             */
+            comment: string;
+
+            /**
+             * A block of raw HTML representing a preview of the uploaded file and warnings.
+             * May include thumbnails, links, and warnings.
+             */
+            html: string;
+
+            /**
+             * The canonical page title for the uploaded file (e.g., "File:Test.png").
+             */
+            canonicaltitle: string;
+
+            /**
+             * Direct URL to access the uploaded image file.
+             */
+            url: string;
+
+            /**
+             * URL to the MediaWiki file description page for this file.
+             */
+            descriptionurl: string;
+
+            /**
+             * SHA-1 hash of the uploaded file content.
+             */
+            sha1: string;
+
+            /**
+             * Array of low-level metadata extracted from the file.
+             * May include EXIF data, resolution info, color type, etc.
+             */
+            metadata: MediaWikiImageMetadata[];
+
+            /**
+             * Common image metadata fields such as resolution and units.
+             */
+            commonmetadata: MediaWikiSimpleMetadata[];
+
+            /**
+             * Extended metadata including structured EXIF-style tags.
+             */
+            extmetadata: Record<string, {
+                /**
+                 * Value of the metadata field (can be raw HTML or plain text).
+                 */
+                value: string;
+
+                /**
+                 * Indicates how the value was generated (e.g., "mediawiki-metadata").
+                 */
+                source: string;
+
+                /**
+                 * If set, this field is considered hidden in the UI.
+                 */
+                hidden?: string;
+            }>;
+
+            /**
+             * MIME type of the uploaded file (e.g., "image/png").
+             */
+            mime: string;
+
+            /**
+             * General media type (e.g., "BITMAP", "AUDIO", "VIDEO").
+             */
+            mediatype: string;
+
+            /**
+             * Bit depth of the image file (e.g., 8, 16).
+             */
+            bitdepth: number;
+        };
+    };
+
+    /**
+     * If the upload failed, this object provides details about the error,
+     * such as the error code and message.
+     */
+    error?: MediaWikiErrorCodeResponse;
+}
+
+/**
+ * A utility class for handling and accessing the response from a MediaWiki file upload operation.
+ * Provides convenient methods to extract key details about the upload result.
+ */
+export class MediaWikiQueryUploadFileResponseClass implements MediaWikiQueryUploadFileResponse {
+    batchcomplete: boolean;
+    upload?: {
+        warnings: string[];
+        result: "Success" | "Warning" | "Error";
+        filename: string;
+        imageinfo: {
+            timestamp: string;
+            user: string;
+            userid: number;
+            size: number;
+            width: number;
+            height: number;
+            parsedcomment: string;
+            comment: string;
+            html: string;
+            canonicaltitle: string;
+            url: string;
+            descriptionurl: string;
+            sha1: string;
+            metadata: MediaWikiImageMetadata[];
+            commonmetadata: MediaWikiSimpleMetadata[];
+            extmetadata: Record<string, { value: string; source: string; hidden?: string }>;
+            mime: string;
+            mediatype: string;
+            bitdepth: number;
+        };
+    };
+    error?: MediaWikiErrorCodeResponse;
+
+    constructor(data: MediaWikiQueryUploadFileResponse | null | undefined) {
+        this.batchcomplete = data?.batchcomplete ?? false;
+        this.upload = data?.upload;
+        this.error = data?.error;
+    }
+
+    public getResult(): string {
+        return this.upload?.result ?? "Error";
+    }
+
+    public getFilename(): string {
+        return this.upload?.filename ?? "";
+    }
+
+    public getCanonicalTitle(): string {
+        return this.upload?.imageinfo.canonicaltitle ?? "";
+    }
+
+    public getFileUrl(): string {
+        return this.upload?.imageinfo.url ?? "";
+    }
+
+    public getDescriptionUrl(): string {
+        return this.upload?.imageinfo.descriptionurl ?? "";
+    }
+
+    public getSha1(): string {
+        return this.upload?.imageinfo.sha1 ?? "";
+    }
+
+    public getMime(): string {
+        return this.upload?.imageinfo.mime ?? "";
+    }
+
+    public getMediaType(): string {
+        return this.upload?.imageinfo.mediatype ?? "";
+    }
+
+    public getError(): MediaWikiErrorCodeResponse | undefined {
+        return this.error;
+    }
+}
+
+interface MediaWikiQuerySearchTitlesOptions {
+    query: string;
+    limit: number;
+    namespace?: string | string[] | number | number[];
+}
+
 /**
  * Custom error class for MediaWiki API-specific errors.
  * This class extends the standard `Error` and provides additional properties
@@ -3379,6 +3834,25 @@ export class MediaWikiApiError extends Error {
     }
 }
 
+interface MediaWikiClient {
+    parent: MediaWiki;
+    query(options: MediaWikiPageOptions): Promise<MediaWikiQueryResponse>;
+    page(titles: string[]): Promise<MediaWikiQueryPageResponseClass>;
+    search(srsearch: string, srnamespace?: string[] | null, srlimit?: number | null): Promise<MediaWikiQuerySearchResponse>;
+    siteInfo(): Promise<MediaWikiQuerySiteInfoResponse>;
+    opensearch(options: MediaWikiQueryOpenSearchOptions): Promise<MediaWikiQueryOpenSearchResponse>;
+    parse(options: MediaWikiQueryParseOptions): Promise<MediaWikiQueryParseResponseClass>;
+    categories(options: MediaWikiQueryCategoriesOptions): Promise<MediaWikiQueryCategoriesResponse>;
+    revisions(options: MediaWikiQueryRevisionsOptions): Promise<MediaWikiQueryRevisionsResponse>;
+    summary(options: MediaWikiQuerySummaryOptions): Promise<MediaWikiQuerySummaryResponseClass>;
+    userInfo(): Promise<MediaWikiQueryUserInfoResponseClass>;
+    getToken(options: MediaWikiQueryTokensOptions): Promise<MediaWikiQueryTokensResponseClass>;
+    editPage(options: MediaWikiQueryEditPageOptions): Promise<MediaWikiQueryEditPageResponseClass>;
+    random(): Promise<MediaWikiQueryRandomResponse>;
+    uploadFile(options: MediaWikiQueryUploadFileOptions): Promise<MediaWikiQueryUploadFileResponseClass>;
+    searchTitles(options: MediaWikiQuerySearchTitlesOptions): Promise<string[]>;
+}
+
 /**
  * A client for interacting with the MediaWiki API.
  * Provides methods for common API actions.
@@ -3389,6 +3863,8 @@ export class MediaWiki {
     private cookieStore: CookieStore;
     private authorized: boolean;
     private siteInfo: any;
+    client: MediaWikiClient;
+    private parent: MediaWiki;
 
     /**
      * Creates an instance of the MediaWiki client.
@@ -3420,6 +3896,614 @@ export class MediaWiki {
         if (options.format && options.format !== "json") {
             throw new Error(`Expected "json" format but got "${options.format}". The library only speaks JSON...`);
         }
+
+        this.parent = this;
+        this.client = {
+            parent: this.parent,
+            /**
+             * Executes a full MediaWiki API query with various combinations of prop, meta, and list options.
+             * 
+             * @param options - The detailed query options.
+             * @returns A promise resolving to the full MediaWiki API response.
+             * @throws {Error} If required options are missing or incompatible.
+             * 
+             * @example
+             * mediaWiki.client.query({
+             *   titles: ["Main Page"],
+             *   prop: ["extracts", "categories"],
+             *   indexpageids: true
+             * }).then(response => {
+             *   console.log(response);
+             * });
+             */
+            async query(options: MediaWikiPageOptions): Promise<MediaWikiQueryResponse> {
+                if (!options) {
+                    throw new Error("Options are required for the query method.");
+                }
+
+                if (options.title && options.titles) {
+                    throw new Error(`Use either "title" or "titles", not both.`);
+                }
+
+                if (options.titles && options.pageids) {
+                    throw new Error(`Cannot use both "titles" and "pageids". Use only one identifier method.`);
+                }
+
+                if (options.titles && (!options.prop && !options.meta && options.list)) {
+                    throw new Error(`"titles" provided but no "prop", "meta", or "list" specified. Nothing to retrieve.`);
+                }
+
+                if (!options.titles && options.export) {
+                    throw new Error(`"export" requires "titles" to be set.`);
+                }
+
+                if (options.indexpageids && (!options.titles && !options.pageids)) {
+                    throw new Error(`"indexpageids" only works with "titles" or "pageids".`);
+                }
+
+                if (options.redirects && (!options.titles && !options.title && !options.pageids)) {
+                    throw new Error(`"redirects" has no effect without "titles", "pageids", or "title".`);
+                }
+
+                if (options.prop && (!options.titles && !options.pageids)) {
+                    throw new Error(`"prop" requires either "titles", "pageids".`);
+                }
+
+                const queryParams: Record<string, any> = {
+                    action: "query",
+                    prop: options.prop?.join("|"),
+                    list: options.list?.join("|"),
+                    meta: options.meta?.join("|"),
+                    indexpageids: options.indexpageids,
+                    export: options.export,
+                    titles: options.titles?.join("|"),
+                    pageids: options.pageids?.join("|"),
+                    srsearch: options.srsearch,
+                    srnamespace: options.srnamespace?.join("|"),
+                    srlimit: options.srlimit,
+                    srprop: options.srprop?.join("|"),
+                    srwhat: options.srwhat,
+                    srinfo: options.srinfo,
+                    rvlimit: options.rvlimit,
+                    exintro: options.exintro,
+                    explaintext: options.explaintext,
+                    uiprop: options.uiprop,
+                    type: options.type
+                };
+
+                const filteredParams = this.parent.filterParams(queryParams);
+
+                return this.parent.fetchData({
+                    method: "GET",
+                    params: filteredParams,
+                    url: this.parent.baseURL
+                });
+            },
+
+            /**
+             * Retrieves basic content and metadata for one or more pages by title.
+             * Uses 'query' with predefined props such as 'extracts', 'categories', 'revisions'.
+             * 
+             * @param titles - List of page titles to retrieve.
+             * @returns A promise resolving to the page response data.
+             * @throws {Error} If titles is missing or empty.
+             * 
+             * @example
+             * mediaWiki.client.page(["Main Page"])
+             *   .then(pageData => console.log(pageData));
+             */
+            async page(titles: string[]): Promise<MediaWikiQueryPageResponseClass> {
+                if (!titles || titles.length === 0) {
+                    throw new Error("Missing or empty 'titles' - must be a non-empty.");
+                }
+
+                const query: MediaWikiPageOptions = {
+                    prop: ["info", "extracts", "categories", "revisions"],
+                    titles: titles,
+                    indexpageids: true
+                };
+
+                const res = await this.query(query);
+                if (!res || !res.query) {
+                    return new MediaWikiQueryPageResponseClass(res as unknown as MediaWikiQueryPageResponseClass, this.parent);
+                }
+
+                return new MediaWikiQueryPageResponseClass(res as unknown as MediaWikiQueryPageResponseClass, this.parent);
+            },
+
+            /**
+             * Searches the wiki using the 'search' list API.
+             * @param srsearch - The search query string; must be non-empty.
+             * @param srnamespace - Optional array of namespaces to limit the search.
+             * @param srlimit - Optional number to limit the number of results (default 10).
+             * @returns Promise resolving to the search results response.
+             */
+            async search(srsearch: string, srnamespace?: string[] | null, srlimit?: number | null): Promise<MediaWikiQuerySearchResponse> {
+                if (!srsearch || srsearch.trim() === "") {
+                    throw new Error(`Missing "srsearch" - must be a non-empty string.`);
+                }
+
+                const query: MediaWikiPageOptions = {
+                    list: ["search"],
+                    srsearch,
+                    srnamespace: srnamespace ?? [],
+                    srlimit: srlimit ?? 10
+                };
+
+                const res = await this.parent.client.query(query);
+                if (!res || !res.query) {
+                    return res as unknown as MediaWikiQuerySearchResponse;
+                }
+
+                return res as MediaWikiQuerySearchResponse;
+            },
+
+            /**
+             * Fetches general site metadata via 'meta=siteinfo'.
+             * Includes site name, generator, case sensitivity, and namespaces.
+             * @returns Promise resolving to site info data.
+             * @example
+             * async function getSiteDetails() {
+             *   const client = new MediaWiki({ baseURL: "https://en.wikipedia.org/w/api.php" });
+             *   try {
+             *     const siteInfo = await client.client.siteInfo();
+             *     console.log(siteInfo.query.general.sitename);
+             *   } catch (error) {
+             *     console.error("Failed to get site info:", error);
+             *   }
+             * }
+             * getSiteDetails();
+             * @see https://www.mediawiki.org/wiki/API:Siteinfo
+             */
+            async siteInfo(): Promise<MediaWikiQuerySiteInfoResponse> {
+                const query: MediaWikiPageOptions = {
+                    meta: ["siteinfo"]
+                }
+
+                const res = await this.query(query);
+                this.parent.siteInfo = res?.query ?? null;
+
+                if (!this.parent.siteInfo || !this.parent.siteInfo.general) {
+                    return res as unknown as MediaWikiQuerySiteInfoResponse;
+                }
+
+                return res as MediaWikiQuerySiteInfoResponse;
+            },
+
+            /**
+            * Performs a legacy 'opensearch' API call for autocomplete-like suggestions.
+            * @param options - Object containing 'search' string and optional 'limit', 'namespace', 'suggest'.
+            * @returns Promise resolving to OpenSearch formatted results.
+            * @throws If options or search term is missing.
+            */
+            async opensearch(options: MediaWikiQueryOpenSearchOptions): Promise<MediaWikiQueryOpenSearchResponse> {
+                if (!options) {
+                    throw new Error("Options are required for the opensearch method.");
+                }
+
+                if (!options.search) {
+                    throw new Error("A search is required for the opensearch method.");
+                }
+
+                const query = {
+                    action: "opensearch",
+                    ...options
+                }
+
+                const filteredParams = this.parent.filterParams(query);
+                const res = await this.parent.fetchData({
+                    method: "GET",
+                    url: this.parent.baseURL,
+                    params: filteredParams
+                });
+
+                if (!res || !res.query) {
+                    return res as unknown as MediaWikiQueryOpenSearchResponse;
+                }
+
+                return res as MediaWikiQueryOpenSearchResponse;
+            },
+
+            /**
+             * Parses a page or text content using the 'parse' API action.
+             * Can return rendered HTML, sections, categories, etc.
+             * @param options - Must include at least one of 'page', 'pageid', or 'text'.
+             * @returns Promise resolving to the parsed content response class instance.
+             * @throws If required parameters are missing.
+             */
+            async parse(options: MediaWikiQueryParseOptions): Promise<MediaWikiQueryParseResponseClass> {
+                if (!options) {
+                    throw new Error(`Options are required for the parse method.`);
+                }
+
+                if (!options.page && !options.pageid && !options.text) {
+                    throw new Error(`You must provide either "page", "pageid" or "text" for the parse method.`);
+                }
+
+                const query = {
+                    action: "parse",
+                    ...options
+                };
+
+                const filteredParams = this.parent.filterParams(query);
+                const res = await this.parent.fetchData({
+                    method: "GET",
+                    url: this.parent.baseURL,
+                    params: filteredParams
+                });
+
+                if (!res || !res.parse) {
+                    return new MediaWikiQueryParseResponseClass(res as unknown as MediaWikiQueryParseResponse);
+                }
+
+                return new MediaWikiQueryParseResponseClass(res as MediaWikiQueryParseResponse);
+            },
+
+            /**
+             * Retrieves categories of a wiki page by its title.
+             * @param options - Must include a non-empty 'title' string.
+             * @returns Promise resolving to categories response.
+             * @throws If 'title' is missing or invalid.
+             */
+            async categories(options: MediaWikiQueryCategoriesOptions): Promise<MediaWikiQueryCategoriesResponse> {
+                if (!options || !options.title) {
+                    throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
+                }
+
+                const resQuery: MediaWikiPageOptions = {
+                    titles: [options.title],
+                    prop: ["categories"]
+                };
+
+                const res = await this.query(resQuery);
+
+                if (!res || !res.query || typeof res.query.pages !== "object") {
+                    return {
+                        continue: res.continue ?? {} as MediaWikiComprehensiveContinueBlock,
+                        query: {
+                            normalized: [],
+                            pages: []
+                        }
+                    };
+                }
+
+                const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQueryCategoriesItem[];
+                const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
+
+                return {
+                    continue: res.continue as MediaWikiComprehensiveContinueBlock,
+                    query: {
+                        normalized: normalizedArr,
+                        pages: pagesArr
+                    }
+                };
+            },
+
+            /**
+             * Retrieves revision history of a page by its title.
+             * @param options - Must include a non-empty 'title' string; optionally 'rvlimit'.
+             * @returns Promise resolving to revisions response.
+             * @throws If 'title' is missing or invalid.
+             */
+            async revisions(options: MediaWikiQueryRevisionsOptions): Promise<MediaWikiQueryRevisionsResponse> {
+                if (!options || !options.title) {
+                    throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
+                }
+
+                const query: MediaWikiPageOptions = {
+                    titles: [options.title],
+                    prop: ["revisions"],
+                    rvlimit: options.rvlimit
+                };
+
+                const res = await this.parent.client.query(query);
+                if (!res || !res.query || typeof res.query.pages !== "object") {
+                    return {
+                        batchcomplete: false,
+                        query: {
+                            normalized: [],
+                            pages: []
+                        }
+                    };
+                }
+
+                const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQueryRevisionsItem[];
+                const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
+                return {
+                    batchcomplete: res.batchcomplete ?? false,
+                    query: {
+                        normalized: normalizedArr,
+                        pages: pagesArr
+                    }
+                };
+            },
+
+            /**
+             * Retrieves a summary extract (intro paragraph) of a page.
+             * @param options - Must include a non-empty 'title' string.
+             * @returns Promise resolving to a summary response class instance.
+             * @throws If 'title' is missing or invalid.
+             */
+            async summary(options: MediaWikiQuerySummaryOptions): Promise<MediaWikiQuerySummaryResponseClass> {
+                if (!options || !options.title) {
+                    throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
+                }
+
+                const query: MediaWikiPageOptions = {
+                    titles: [options.title],
+                    prop: ["extracts"],
+                    exintro: true,
+                    explaintext: true
+                };
+
+                const res = await this.query(query);
+
+                if (!res) {
+                    return new MediaWikiQuerySummaryResponseClass({
+                        batchcomplete: false,
+                        query: { pages: [], normalized: [] }
+                    });
+                }
+
+                if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
+                    return new MediaWikiQuerySummaryResponseClass({
+                        batchcomplete: res.batchcomplete ?? false,
+                        query: {
+                            pages: (res.query?.pages && typeof res.query.pages === 'object' ? Object.values(res.query.pages) : []) as MediaWikiQuerySummaryItem[],
+                            normalized: res.query?.normalized ?? []
+                        },
+                        warnings: res.warnings,
+                        errors: res.errors
+                    });
+                }
+
+                const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQuerySummaryItem[];
+                return new MediaWikiQuerySummaryResponseClass({
+                    batchcomplete: res.batchcomplete,
+                    query: {
+                        normalized: res.query.normalized ?? [],
+                        pages: pagesArr
+                    }
+                });
+            },
+
+            /**
+             * Retrieves information about the current user.
+             * @returns Promise resolving to user info response class instance.
+             */
+            async userInfo(): Promise<MediaWikiQueryUserInfoResponseClass> {
+                const query: MediaWikiPageOptions = {
+                    meta: ["userinfo"],
+                    uiprop: "*"
+                };
+
+                const res = await this.query(query);
+
+                if (!res) {
+                    return new MediaWikiQueryUserInfoResponseClass({
+                        batchcomplete: false,
+                        query: {
+                            userinfo: {
+                                id: -1,
+                                name: "",
+                                groups: [],
+                                groupmemberships: [],
+                                implicitgroups: [],
+                                rights: [],
+                                changeablegroups: { add: [], remove: [], "add-self": [], "remove-self": [] },
+                                options: {} as MediaWikiQueryUserInfoOptions,
+                                editcount: -1,
+                                ratelimits: {}
+                            }
+                        }
+                    });
+                }
+
+                if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
+                    return new MediaWikiQueryUserInfoResponseClass({
+                        batchcomplete: res.batchcomplete ?? false,
+                        query: {
+                            userinfo: res.query?.userinfo as MediaWikiQueryUserInfoDetails,
+                        },
+                        warnings: res.warnings,
+                        errors: res.errors
+                    });
+                }
+
+                return new MediaWikiQueryUserInfoResponseClass(res as MediaWikiQueryUserInfoResponseClass);
+            },
+
+            /**
+             * Retrieves tokens for given types, such as CSRF tokens.
+             * @param options - Object with 'type' specifying token types to fetch.
+             * @returns Promise resolving to tokens response class instance.
+             */
+            async getToken(options: MediaWikiQueryTokensOptions): Promise<MediaWikiQueryTokensResponseClass> {
+                const query: MediaWikiPageOptions = {
+                    meta: ["tokens"],
+                    type: options.type.join("|")
+                };
+
+                const res = await this.query(query);
+
+                if (!res || !res.query || !res.query.tokens) {
+                    throw new Error(`Failed to retrieve tokens or unexpected response structure: ${JSON.stringify(res)}`);
+                }
+
+                return new MediaWikiQueryTokensResponseClass(res as MediaWikiQueryTokensResponseClass);
+            },
+
+            /**
+             * Edits a page by providing 'title' or 'pageid' and new 'text'.
+             * Requires a CSRF token.
+             * @param options - Must include either 'title' or 'pageid', and 'text'.
+             * @returns Promise resolving to the edit page response class instance.
+             * @throws If required parameters are missing.
+             */
+            async editPage(options: MediaWikiQueryEditPageOptions): Promise<MediaWikiQueryEditPageResponseClass> {
+                if (!options) {
+                    throw new Error("Options are required for the editpage method.");
+                }
+
+                if (!options.title && !options.pageid && !options.text) {
+                    throw new Error(`You must provide either "page", "pageid" or "text" for the editpage method.`);
+                }
+
+                const csrfResponse = await this.getToken({ type: ["csrf"] });
+
+                const query = {
+                    token: csrfResponse.query.tokens.csrftoken,
+                    action: "edit",
+                    ...options
+                };
+
+                const filteredParams = this.parent.filterParams(query);
+                const res = await this.parent.fetchData({
+                    method: "POST",
+                    url: this.parent.baseURL,
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    data: this.parent.formURLEncoder(filteredParams)
+                });
+
+                if (!res || !res.query) {
+                    return new MediaWikiQueryEditPageResponseClass(res as unknown as MediaWikiQueryEditPageResponseClass);
+                }
+
+                return new MediaWikiQueryEditPageResponseClass(res as MediaWikiQueryEditPageResponseClass);
+            },
+
+            async random(): Promise<MediaWikiQueryRandomResponse> {
+                const query: MediaWikiPageOptions = {
+                    action: "query",
+                    list: ["random"]
+                };
+
+                const res = await this.query(query);
+                if (!res || !res.query) {
+                    return res as unknown as MediaWikiQueryRandomResponse;
+                }
+
+                return res as MediaWikiQueryRandomResponse;
+            },
+
+            /**
+             * Uploads a file to MediaWiki.
+             * @param options - Options for the file upload.
+             * @returns Promise resolving to an instance of MediaWikiQueryUploadFileResponseClass.
+             * @throws {Error} If required parameters are missing or an error occurs during upload.
+             */
+            async uploadFile(options: MediaWikiQueryUploadFileOptions): Promise<MediaWikiQueryUploadFileResponseClass> {
+                if (!options) {
+                    throw new Error("The 'options' parameter is required for uploadFile.");
+                }
+
+                if (!options.filekey && !options.filename) {
+                    throw new Error("The 'filename' parameter is required if 'filekey' is not provided.");
+                }
+
+                if (!options.file && !options.url && !options.filekey) {
+                    throw new Error("A file source must be provided: 'file', 'url', or 'filekey'.");
+                }
+
+                if (options.file && !options.mimeType && options.file instanceof Buffer) {
+                    console.warn("It's recommended to specify 'mimeType' when 'file' is a Buffer. Defaulting to 'application/octet-stream'.");
+                }
+
+                const tokenResponse = await this.getToken({ type: ["csrf"] });
+                const csrfToken = tokenResponse.getCsrfToken();
+                if (!csrfToken) {
+                    throw new Error("Failed to obtain CSRF token for file upload.");
+                }
+
+                const formData = new FormData();
+                formData.append("action", "upload");
+                formData.append("token", csrfToken);
+                formData.append("format", this.parent.params.format ?? "json");
+
+                if (this.parent.params.formatversion) {
+                    formData.append("formatversion", String(this.parent.params.formatversion));
+                }
+
+                if (options.filename) formData.append("filename", options.filename);
+                if (options.comment) formData.append("comment", options.comment);
+                if (options.text) formData.append("text", options.text);
+                if (options.tags) formData.append("tags", options.tags);
+                if (options.watchlist) formData.append("watchlist", options.watchlist);
+                if (options.ignorewarnings !== undefined) formData.append("ignorewarnings", options.ignorewarnings ? "1" : "0");
+                if (options.async !== undefined) formData.append("async", options.async ? "1" : "0");
+                if (options.bot !== undefined) formData.append("bot", options.bot ? "1" : "0");
+
+                if (options.file) {
+                    let fileData: Blob;
+                    let partFilename = options.filename || "upload.dat";
+
+                    if (options.file instanceof Buffer) {
+                        fileData = new Blob([options.file], { type: options.mimeType || 'application/octet-stream' });
+                    } else if (typeof (options.file as any).pipe === 'function' && typeof (options.file as any).on === 'function') {
+                        throw new Error("Direct upload of ReadableStream is not supported. Convert to Buffer or Blob, or use 'url' or 'filekey'.");
+                    } else {
+                        fileData = options.file as unknown as Blob;
+                        if (options.file instanceof File && (options.file as File).name) {
+                            partFilename = (options.file as File).name;
+                        }
+                    }
+                    formData.append("file", fileData, partFilename);
+                } else if (options.url) {
+                    formData.append("url", options.url);
+                } else if (options.filekey) {
+                    formData.append("filekey", options.filekey);
+                }
+
+                const responseData = await this.parent.fetchData({
+                    method: "POST",
+                    url: this.parent.baseURL,
+                    data: formData
+                });
+
+                return new MediaWikiQueryUploadFileResponseClass(responseData);
+            },
+
+            async searchTitles(options: MediaWikiQuerySearchTitlesOptions): Promise<string[]> {
+                const { query, limit, namespace } = options;
+                if (!query || query.trim() === "") {
+                    throw new Error("Search query cannot be empty.");
+                }
+
+                const queryParams: MediaWikiPageOptions = {
+                    action: "query",
+                    list: ["search"],
+                    srsearch: query,
+                    srlimit: limit,
+                    srprop: ["titlesnippet"]
+                };
+
+                if (namespace !== undefined) {
+                    if (Array.isArray(namespace)) {
+                        queryParams.srnamespace = namespace.map(ns => String(ns));
+                    } else {
+                        queryParams.srnamespace = [String(namespace)];
+                    }
+                }
+
+                try {
+                    const response = await this.query(queryParams);
+                    if (response.query && response.query.search) {
+                        return response.query.search.map((item: MediaWikiListSearchItem) => item.title);
+                    }
+                    return [];
+                } catch (error) {
+                    console.error(`Error in searchTitles for query "${query}":`, error);
+                    throw error;
+                }
+            }
+        }
+
+        Object.defineProperty(this.client, 'parent', {
+            value: this.parent,
+            writable: false,
+            enumerable: false,
+            configurable: false
+        });
     }
 
     /**
@@ -3460,14 +4544,28 @@ export class MediaWiki {
                 headers["Cookie"] = cookieString;
             }
 
+            let bodyToSend: BodyInit | undefined = undefined;
+            if (options.method !== "GET" && options.data) {
+                if (options.data instanceof FormData ||
+                    typeof options.data === 'string' ||
+                    options.data instanceof URLSearchParams ||
+                    options.data instanceof ReadableStream
+                ) {
+                    bodyToSend = options.data;
+                } else {
+                    bodyToSend = JSON.stringify(options.data);
+                    if (options.headers && !options.headers['Content-Type'] && !options.headers['content-type']) {
+                        options.headers['Content-Type'] = 'application/json';
+                    } else if (!options.headers) {
+                        options.headers = { 'Content-Type': 'application/json' };
+                    }
+                }
+            }
+
             const res = await fetch(urlObj.toString(), {
                 method: options.method,
                 headers,
-                body: options.method !== "GET" && options.data
-                    ? typeof options.data === "string"
-                        ? options.data
-                        : JSON.stringify(options.data)
-                    : undefined,
+                body: bodyToSend
             });
 
             const setCookie = res.headers.getSetCookie?.() || res.headers.get?.("set-cookie");
@@ -3772,498 +4870,5 @@ export class MediaWiki {
             id: parseInt(id, 10),
             name: ns["*"]
         }));
-    }
-
-    /**
-     * API client methods.
-     */
-    client = {
-        /**
-         * Executes a full MediaWiki API query with various combinations of prop, meta, and list options.
-         * 
-         * @param options - The detailed query options.
-         * @returns A promise resolving to the full MediaWiki API response.
-         * @throws {Error} If required options are missing or incompatible.
-         * 
-         * @example
-         * mediaWiki.client.query({
-         *   titles: ["Main Page"],
-         *   prop: ["extracts", "categories"],
-         *   indexpageids: true
-         * }).then(response => {
-         *   console.log(response);
-         * });
-         */
-        query: async (options: MediaWikiPageOptions): Promise<MediaWikiQueryResponse> => {
-            if (!options) {
-                throw new Error("Options are required for the query method.");
-            }
-
-            if (options.title && options.titles) {
-                throw new Error(`Use either "title" or "titles", not both.`);
-            }
-
-            if (options.titles && options.pageids) {
-                throw new Error(`Cannot use both "titles" and "pageids". Use only one identifier method.`);
-            }
-
-            if (options.titles && (!options.prop && !options.meta && options.list)) {
-                throw new Error(`"titles" provided but no "prop", "meta", or "list" specified. Nothing to retrieve.`);
-            }
-
-            if (!options.titles && options.export) {
-                throw new Error(`"export" requires "titles" to be set.`);
-            }
-
-            if (options.indexpageids && (!options.titles && !options.pageids)) {
-                throw new Error(`"indexpageids" only works with "titles" or "pageids".`);
-            }
-
-            if (options.redirects && (!options.titles && !options.title && !options.pageids)) {
-                throw new Error(`"redirects" has no effect without "titles", "pageids", or "title".`);
-            }
-
-            if (options.prop && (!options.titles && !options.pageids)) {
-                throw new Error(`"prop" requires either "titles", "pageids".`);
-            }
-
-            const queryParams: Record<string, any> = {
-                action: "query",
-                prop: options.prop?.join("|"),
-                list: options.list?.join("|"),
-                meta: options.meta?.join("|"),
-                indexpageids: options.indexpageids,
-                export: options.export,
-                titles: options.titles?.join("|"),
-                pageids: options.pageids?.join("|"),
-                srsearch: options.srsearch,
-                srnamespace: options.srnamespace?.join("|"),
-                srlimit: options.srlimit,
-                srprop: options.srprop?.join("|"),
-                srwhat: options.srwhat,
-                srinfo: options.srinfo,
-                rvlimit: options.rvlimit,
-                exintro: options.exintro,
-                explaintext: options.explaintext,
-                uiprop: options.uiprop,
-                type: options.type
-            };
-
-            const filteredParams = this.filterParams(queryParams);
-
-            return this.fetchData({
-                method: "GET",
-                params: filteredParams,
-                url: this.baseURL
-            });
-        },
-
-        /**
-         * Retrieves basic content and metadata for one or more pages by title.
-         * Uses 'query' with predefined props such as 'extracts', 'categories', 'revisions'.
-         * 
-         * @param titles - List of page titles to retrieve.
-         * @returns A promise resolving to the page response data.
-         * @throws {Error} If titles is missing or empty.
-         * 
-         * @example
-         * mediaWiki.client.page(["Main Page"])
-         *   .then(pageData => console.log(pageData));
-         */
-        page: async (titles: string[]): Promise<MediaWikiQueryPageResponseClass> => {
-            if (!titles || titles.length === 0) {
-                throw new Error("Missing or empty 'titles' - must be a non-empty.");
-            }
-
-            const query: MediaWikiPageOptions = {
-                prop: ["info", "extracts", "categories", "revisions"],
-                titles: titles,
-                indexpageids: true
-            };
-
-            const res = await this.client.query(query);
-            if (!res || !res.query) {
-                return new MediaWikiQueryPageResponseClass(res as unknown as MediaWikiQueryPageResponseClass, this);
-            }
-
-            return new MediaWikiQueryPageResponseClass(res as unknown as MediaWikiQueryPageResponseClass, this);
-        },
-
-        /**
-         * Searches the wiki using the 'search' list API.
-         * @param srsearch - The search query string; must be non-empty.
-         * @param srnamespace - Optional array of namespaces to limit the search.
-         * @param srlimit - Optional number to limit the number of results (default 10).
-         * @returns Promise resolving to the search results response.
-         */
-        search: async (srsearch: string, srnamespace?: string[] | null, srlimit?: number | null): Promise<MediaWikiQuerySearchResponse> => {
-            if (!srsearch || srsearch.trim() === "") {
-                throw new Error(`Missing "srsearch" - must be a non-empty string.`);
-            }
-
-            const query: MediaWikiPageOptions = {
-                list: ["search"],
-                srsearch,
-                srnamespace: srnamespace ?? [],
-                srlimit: srlimit ?? 10
-            };
-
-            const res = await this.client.query(query);
-            if (!res || !res.query) {
-                return res as unknown as MediaWikiQuerySearchResponse;
-            }
-
-            return res as MediaWikiQuerySearchResponse;
-        },
-
-        /**
-         * Fetches general site metadata via 'meta=siteinfo'.
-         * Includes site name, generator, case sensitivity, and namespaces.
-         * @returns Promise resolving to site info data.
-         * @example
-         * async function getSiteDetails() {
-         *   const client = new MediaWiki({ baseURL: "https://en.wikipedia.org/w/api.php" });
-         *   try {
-         *     const siteInfo = await client.client.siteInfo();
-         *     console.log(siteInfo.query.general.sitename);
-         *   } catch (error) {
-         *     console.error("Failed to get site info:", error);
-         *   }
-         * }
-         * getSiteDetails();
-         * @see https://www.mediawiki.org/wiki/API:Siteinfo
-         */
-        siteInfo: async (): Promise<MediaWikiQuerySiteInfoResponse> => {
-            const query: MediaWikiPageOptions = {
-                meta: ["siteinfo"]
-            }
-
-            const res = await this.client.query(query);
-            this.siteInfo = res?.query ?? null;
-
-            if (!this.siteInfo || !this.siteInfo.general) {
-                return res as unknown as MediaWikiQuerySiteInfoResponse;
-            }
-
-            return res as MediaWikiQuerySiteInfoResponse;
-        },
-
-        /**
-        * Performs a legacy 'opensearch' API call for autocomplete-like suggestions.
-        * @param options - Object containing 'search' string and optional 'limit', 'namespace', 'suggest'.
-        * @returns Promise resolving to OpenSearch formatted results.
-        * @throws If options or search term is missing.
-        */
-        opensearch: async (options: MediaWikiQueryOpenSearchOptions): Promise<MediaWikiQueryOpenSearchResponse> => {
-            if (!options) {
-                throw new Error("Options are required for the opensearch method.");
-            }
-
-            if (!options.search) {
-                throw new Error("A search is required for the opensearch method.");
-            }
-
-            const query = {
-                action: "opensearch",
-                ...options
-            }
-
-            const filteredParams = this.filterParams(query);
-            const res = await this.fetchData({
-                method: "GET",
-                url: this.baseURL,
-                params: filteredParams
-            });
-
-            if (!res || !res.query) {
-                return res as unknown as MediaWikiQueryOpenSearchResponse;
-            }
-
-            return res as MediaWikiQueryOpenSearchResponse;
-        },
-
-        /**
-         * Parses a page or text content using the 'parse' API action.
-         * Can return rendered HTML, sections, categories, etc.
-         * @param options - Must include at least one of 'page', 'pageid', or 'text'.
-         * @returns Promise resolving to the parsed content response class instance.
-         * @throws If required parameters are missing.
-         */
-        parse: async (options: MediaWikiQueryParseOptions): Promise<MediaWikiQueryParseResponseClass> => {
-            if (!options) {
-                throw new Error(`Options are required for the parse method.`);
-            }
-
-            if (!options.page && !options.pageid && !options.text) {
-                throw new Error(`You must provide either "page", "pageid" or "text" for the parse method.`);
-            }
-
-            const query = {
-                action: "parse",
-                ...options
-            };
-
-            const filteredParams = this.filterParams(query);
-            const res = await this.fetchData({
-                method: "GET",
-                url: this.baseURL,
-                params: filteredParams
-            });
-
-            if (!res || !res.parse) {
-                return new MediaWikiQueryParseResponseClass(res as unknown as MediaWikiQueryParseResponse);
-            }
-
-            return new MediaWikiQueryParseResponseClass(res as MediaWikiQueryParseResponse);
-        },
-
-        /**
-         * Retrieves categories of a wiki page by its title.
-         * @param options - Must include a non-empty 'title' string.
-         * @returns Promise resolving to categories response.
-         * @throws If 'title' is missing or invalid.
-         */
-        categories: async (options: MediaWikiQueryCategoriesOptions): Promise<MediaWikiQueryCategoriesResponse> => {
-            if (!options || !options.title) {
-                throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
-            }
-
-            const resQuery: MediaWikiPageOptions = {
-                titles: [options.title],
-                prop: ["categories"]
-            };
-
-            const res = await this.client.query(resQuery);
-
-            if (!res || !res.query || typeof res.query.pages !== "object") {
-                return {
-                    continue: res.continue ?? {} as MediaWikiComprehensiveContinueBlock,
-                    query: {
-                        normalized: [],
-                        pages: []
-                    }
-                };
-            }
-
-            const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQueryCategoriesItem[];
-            const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
-
-            return {
-                continue: res.continue as MediaWikiComprehensiveContinueBlock,
-                query: {
-                    normalized: normalizedArr,
-                    pages: pagesArr
-                }
-            };
-        },
-
-        /**
-         * Retrieves revision history of a page by its title.
-         * @param options - Must include a non-empty 'title' string; optionally 'rvlimit'.
-         * @returns Promise resolving to revisions response.
-         * @throws If 'title' is missing or invalid.
-         */
-        revisions: async (options: MediaWikiQueryRevisionsOptions): Promise<MediaWikiQueryRevisionsResponse> => {
-            if (!options || !options.title) {
-                throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
-            }
-
-            const query: MediaWikiPageOptions = {
-                titles: [options.title],
-                prop: ["revisions"],
-                rvlimit: options.rvlimit
-            };
-
-            const res = await this.client.query(query);
-            if (!res || !res.query || typeof res.query.pages !== "object") {
-                return {
-                    batchcomplete: false,
-                    query: {
-                        normalized: [],
-                        pages: []
-                    }
-                };
-            }
-
-            const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQueryRevisionsItem[];
-            const normalizedArr = Array.isArray(res.query.normalized) ? res.query.normalized : [];
-            return {
-                batchcomplete: res.batchcomplete ?? false,
-                query: {
-                    normalized: normalizedArr,
-                    pages: pagesArr
-                }
-            };
-        },
-
-        /**
-         * Retrieves a summary extract (intro paragraph) of a page.
-         * @param options - Must include a non-empty 'title' string.
-         * @returns Promise resolving to a summary response class instance.
-         * @throws If 'title' is missing or invalid.
-         */
-        summary: async (options: MediaWikiQuerySummaryOptions): Promise<MediaWikiQuerySummaryResponseClass> => {
-            if (!options || !options.title) {
-                throw new Error(`Missing or invalid "title" - must be a non-empty string.`);
-            }
-
-            const query: MediaWikiPageOptions = {
-                titles: [options.title],
-                prop: ["extracts"],
-                exintro: true,
-                explaintext: true
-            };
-
-            const res = await this.client.query(query);
-
-            if (!res) {
-                return new MediaWikiQuerySummaryResponseClass({
-                    batchcomplete: false,
-                    query: { pages: [], normalized: [] }
-                });
-            }
-
-            if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                return new MediaWikiQuerySummaryResponseClass({
-                    batchcomplete: res.batchcomplete ?? false,
-                    query: {
-                        pages: (res.query?.pages && typeof res.query.pages === 'object' ? Object.values(res.query.pages) : []) as MediaWikiQuerySummaryItem[],
-                        normalized: res.query?.normalized ?? []
-                    },
-                    warnings: res.warnings,
-                    errors: res.errors
-                });
-            }
-
-            const pagesArr = Object.values(res.query.pages ?? {}) as MediaWikiQuerySummaryItem[];
-            return new MediaWikiQuerySummaryResponseClass({
-                batchcomplete: res.batchcomplete,
-                query: {
-                    normalized: res.query.normalized ?? [],
-                    pages: pagesArr
-                }
-            });
-        },
-
-        /**
-         * Retrieves information about the current user.
-         * @returns Promise resolving to user info response class instance.
-         */
-        userInfo: async (): Promise<MediaWikiQueryUserInfoResponseClass> => {
-            const query: MediaWikiPageOptions = {
-                meta: ["userinfo"],
-                uiprop: "*"
-            };
-
-            const res = await this.client.query(query);
-
-            if (!res) {
-                return new MediaWikiQueryUserInfoResponseClass({
-                    batchcomplete: false,
-                    query: {
-                        userinfo: {
-                            id: -1,
-                            name: "",
-                            groups: [],
-                            groupmemberships: [],
-                            implicitgroups: [],
-                            rights: [],
-                            changeablegroups: { add: [], remove: [], "add-self": [], "remove-self": [] },
-                            options: {} as MediaWikiQueryUserInfoOptions,
-                            editcount: -1,
-                            ratelimits: {}
-                        }
-                    }
-                });
-            }
-
-            if (!res || !res.query || !res.query.normalized || !res.query.pages || typeof res.query.pages !== "object") {
-                return new MediaWikiQueryUserInfoResponseClass({
-                    batchcomplete: res.batchcomplete ?? false,
-                    query: {
-                        userinfo: res.query?.userinfo as MediaWikiQueryUserInfoDetails,
-                    },
-                    warnings: res.warnings,
-                    errors: res.errors
-                });
-            }
-
-            return new MediaWikiQueryUserInfoResponseClass(res as MediaWikiQueryUserInfoResponseClass);
-        },
-
-        /**
-         * Retrieves tokens for given types, such as CSRF tokens.
-         * @param options - Object with 'type' specifying token types to fetch.
-         * @returns Promise resolving to tokens response class instance.
-         */
-        getToken: async (options: MediaWikiQueryTokensOptions): Promise<MediaWikiQueryTokensResponseClass> => {
-            const query: MediaWikiPageOptions = {
-                meta: ["tokens"],
-                type: options.type.join("|")
-            };
-
-            const res = await this.client.query(query);
-
-            if (!res || !res.query || !res.query.tokens) {
-                throw new Error(`Failed to retrieve tokens or unexpected response structure: ${JSON.stringify(res)}`);
-            }
-
-            return new MediaWikiQueryTokensResponseClass(res as MediaWikiQueryTokensResponseClass);
-        },
-
-
-
-        /**
-         * Edits a page by providing 'title' or 'pageid' and new 'text'.
-         * Requires a CSRF token.
-         * @param options - Must include either 'title' or 'pageid', and 'text'.
-         * @returns Promise resolving to the edit page response class instance.
-         * @throws If required parameters are missing.
-         */
-        editPage: async (options: MediaWikiQueryEditPageOptions): Promise<MediaWikiQueryEditPageResponseClass> => {
-            if (!options) {
-                throw new Error("Options are required for the editpage method.");
-            }
-
-            if (!options.title && !options.pageid && !options.text) {
-                throw new Error(`You must provide either "page", "pageid" or "text" for the editpage method.`);
-            }
-
-            const csrfResponse = await this.client.getToken({ type: ["csrf"] });
-
-            const query = {
-                token: csrfResponse.query.tokens.csrftoken,
-                action: "edit",
-                ...options
-            };
-
-            const filteredParams = this.filterParams(query);
-            const res = await this.fetchData({
-                method: "POST",
-                url: this.baseURL,
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                data: this.formURLEncoder(filteredParams)
-            });
-
-            if (!res || !res.query) {
-                return new MediaWikiQueryEditPageResponseClass(res as unknown as MediaWikiQueryEditPageResponseClass);
-            }
-
-            return new MediaWikiQueryEditPageResponseClass(res as MediaWikiQueryEditPageResponseClass);
-        },
-
-        random: async (): Promise<MediaWikiQueryRandomResponse> => {
-            const query: MediaWikiPageOptions = {
-                action: "query",
-                list: ["random"]
-            };
-
-            const res = await this.client.query(query);
-            if (!res || !res.query) {
-                return res as unknown as MediaWikiQueryRandomResponse;
-            }
-
-            return res as MediaWikiQueryRandomResponse;
-        }
     }
 }

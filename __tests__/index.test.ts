@@ -37,9 +37,10 @@ import {
     MediaWikiListSearchInfo,
     MediaWikiQueryNormalizedItem,
     MediaWikiQueryRedirectItem,
-    MediaWikiComprehensiveContinueBlock
+    MediaWikiComprehensiveContinueBlock,
+    Cookie,
+    CookieStore
 } from '../src/index';
-import { Cookie, CookieStore } from '../src/cookie-store';
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;

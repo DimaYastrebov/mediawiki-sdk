@@ -1,4 +1,21 @@
-import { Cookie } from "./cookie-store";
+export interface Cookie {
+    name: string;
+    value: string;
+    domain: string;
+    path: string;
+    expires?: Date;
+    secure?: boolean;
+    httpOnly?: boolean;
+    sameSite?: "Strict" | "Lax" | "None";
+    hostOnly?: boolean;
+    creationTime: Date;
+}
+export declare class CookieStore {
+    private store;
+    parseSetCookie(setCookieHeader: string, originHost: string): void;
+    private storeCookie;
+    getCookieHeader(url: string): Cookie[];
+}
 /**
  * Possible output formats for the MediaWiki API.
  */
@@ -24,6 +41,7 @@ export type MediaWikiPageOptionsList = "allcategories" | "alldeletedrevisions" |
 export type MediaWikiPageOptionsMeta = "allmessages" | "authmanagerinfo" | "filerepoinfo" | "languageinfo" | "languagestats" | "linterstats" | "managemessagegroups" | "messagegroups" | "messagegroupstats" | "messagetranslations" | "notifications" | "siteinfo" | "tokens" | "unreadnotificationpages" | "userinfo" | "oath";
 export type MediaWikiSearchOptions = "nearmatch" | "text" | "title";
 export type MediaWikiTokensOptions = "*" | "createaccount" | "csrf" | "login" | "patrol" | "rollback" | "userrights" | "watch";
+export type MediaWikiSearchSrPropOptions = "categorysnippet" | "extensiondata" | "hasrelated" | "isfilematch" | "redirectsnippet" | "redirecttitle" | "score" | "sectionsnippet" | "sectiontitle" | "size" | "snippet" | "timestamp" | "titlesnippet" | "wordcount";
 /**
  * Options for initializing the MediaWiki client.
  */
@@ -181,8 +199,8 @@ export interface MediaWikiPageOptions {
     explaintext?: boolean;
     uiprop?: string;
     type?: any;
-    srinfo?: string;
-    srprop?: string[];
+    srinfo?: "totalhits" | "suggestion" | "rewrittenquery";
+    srprop?: MediaWikiSearchSrPropOptions[];
 }
 export interface MediaWikiErrorCodeResponse {
     code: string;
@@ -701,6 +719,53 @@ export interface MediaWikiListSearchInfo {
     totalhits: number;
     suggestion?: string;
     suggestionsnippet?: string;
+}
+/**
+ * Represents a single metadata field returned from MediaWiki's `imageinfo.metadata`.
+ */
+export interface MediaWikiImageMetadata {
+    /**
+     * The internal name/key of the metadata field (e.g., "DateTimeOriginal", "Artist").
+     */
+    name: string;
+    /**
+     * The raw value of the metadata field (can be string, number, or even base64-encoded data).
+     */
+    value: string;
+    /**
+     * Optional human-readable label, if available (e.g., "Original date/time").
+     */
+    label?: string;
+    /**
+     * Optional human-readable value with formatting or localization.
+     */
+    formattedvalue?: string;
+    /**
+     * Optional source of the metadata (e.g., "exif", "iptc", "xmp").
+     */
+    source?: string;
+    /**
+     * Optional name of the metadata space (e.g., "EXIF", "IPTC").
+     */
+    space?: string;
+}
+/**
+ * Represents simplified metadata returned from `commonmetadata`.
+ * Typically includes width, height, resolution, and unit data.
+ */
+export interface MediaWikiSimpleMetadata {
+    /**
+     * Name of the metadata field (e.g., "ImageWidth", "XResolution").
+     */
+    name: string;
+    /**
+     * The value of the metadata field (e.g., "1920", "72").
+     */
+    value: string;
+    /**
+     * Optional source of the field (e.g., "exif").
+     */
+    source?: string;
 }
 /**
  * The main `query` object within a MediaWiki API response, using decomposed types.
@@ -2958,6 +3023,247 @@ export interface MediaWikiQueryRandomResponse extends MediaWikiBaseResponse {
         random: MediaWikiListRandomItem[];
     };
 }
+export interface MediaWikiQueryUploadFileOptions {
+    /**
+     * The name to assign to the uploaded file (i.e., the destination filename on the wiki).
+     * This becomes the title of the File page.
+     */
+    filename?: string;
+    /**
+     * Optional text to include in the upload log and file description.
+     * Often used as the initial page content.
+     */
+    comment?: string;
+    /**
+     * Optional tags to apply to the upload action.
+     * These are used for tagging the edit (e.g., 'api', 'upload', etc.).
+     */
+    tags?: string;
+    /**
+     * The text to use as the initial content of the file description page.
+     * This is often used to provide context or information about the file.
+     */
+    text?: string;
+    /**
+     * The action to take regarding the file's watchlist status.
+     * Can be 'preferences' (default), 'nochange', 'watch', or 'unwatch'.
+     */
+    watchlist?: "preferences" | "nochange" | "watch" | "unwatch";
+    /**
+     * Whether to ignore warnings during upload (e.g., overwriting an existing file).
+     * If set to true, the upload proceeds despite any warnings.
+     */
+    ignorewarnings?: boolean;
+    /**
+     * The file content to upload.
+     * Must be a Buffer (for in-memory files) or a ReadableStream (e.g., from fs.createReadStream).
+     * This is required unless using a previously uploaded file via `filekey` or uploading by `url`.
+     */
+    file?: Buffer | ReadableStream;
+    /**
+     * A URL to fetch the file from for uploading.
+     * Used when uploading from a remote source instead of sending the file directly.
+     */
+    url?: string;
+    /**
+     * A file key returned from a previous upload step (used in stash-based uploads).
+     * This allows continuing a previously started upload.
+     */
+    filekey?: string;
+    /**
+     * Whether the upload should be handled asynchronously.
+     * Useful for large files or for background processing.
+     */
+    async?: boolean;
+    /**
+     * Whether to mark the upload as a bot edit.
+     * Only has an effect if the user is flagged as a bot.
+     */
+    bot?: boolean;
+    /**
+     * The MIME type of the uploaded file (e.g., 'image/png', 'application/pdf').
+     * Required when using the `file` parameter to upload.
+     */
+    mimeType?: string;
+}
+/**
+ * Interface representing the response from a MediaWiki API file upload request.
+ */
+export interface MediaWikiQueryUploadFileResponse extends MediaWikiBaseResponse {
+    /**
+     * Contains upload result details, only present if the upload succeeded or partially succeeded.
+     */
+    upload?: {
+        warnings: string[];
+        /**
+         * Upload result status.
+         *
+         * - `Success`: Upload completed successfully.
+         * - `Warning`: Upload completed with a warning (e.g., file already exists).
+         * - `Error`: Upload failed (details should be in `error`).
+         */
+        result: "Success" | "Warning" | "Error";
+        /**
+         * The name of the uploaded file, which may differ from the original filename
+         * if the server renamed it (e.g., due to conflicts).
+         */
+        filename: string;
+        /**
+         * Detailed metadata and information about the uploaded image.
+         */
+        imageinfo: {
+            /**
+             * ISO 8601 formatted upload timestamp (e.g., "2025-05-25T02:28:36Z").
+             */
+            timestamp: string;
+            /**
+             * Username of the user who uploaded the file.
+             */
+            user: string;
+            /**
+             * User ID of the uploader.
+             */
+            userid: number;
+            /**
+             * Total size of the uploaded file in bytes.
+             */
+            size: number;
+            /**
+             * Width of the uploaded image in pixels.
+             */
+            width: number;
+            /**
+             * Height of the uploaded image in pixels.
+             */
+            height: number;
+            /**
+             * The comment provided by the uploader, after being parsed/cleaned by the server.
+             */
+            parsedcomment: string;
+            /**
+             * The raw, unparsed comment provided during upload.
+             */
+            comment: string;
+            /**
+             * A block of raw HTML representing a preview of the uploaded file and warnings.
+             * May include thumbnails, links, and warnings.
+             */
+            html: string;
+            /**
+             * The canonical page title for the uploaded file (e.g., "File:Test.png").
+             */
+            canonicaltitle: string;
+            /**
+             * Direct URL to access the uploaded image file.
+             */
+            url: string;
+            /**
+             * URL to the MediaWiki file description page for this file.
+             */
+            descriptionurl: string;
+            /**
+             * SHA-1 hash of the uploaded file content.
+             */
+            sha1: string;
+            /**
+             * Array of low-level metadata extracted from the file.
+             * May include EXIF data, resolution info, color type, etc.
+             */
+            metadata: MediaWikiImageMetadata[];
+            /**
+             * Common image metadata fields such as resolution and units.
+             */
+            commonmetadata: MediaWikiSimpleMetadata[];
+            /**
+             * Extended metadata including structured EXIF-style tags.
+             */
+            extmetadata: Record<string, {
+                /**
+                 * Value of the metadata field (can be raw HTML or plain text).
+                 */
+                value: string;
+                /**
+                 * Indicates how the value was generated (e.g., "mediawiki-metadata").
+                 */
+                source: string;
+                /**
+                 * If set, this field is considered hidden in the UI.
+                 */
+                hidden?: string;
+            }>;
+            /**
+             * MIME type of the uploaded file (e.g., "image/png").
+             */
+            mime: string;
+            /**
+             * General media type (e.g., "BITMAP", "AUDIO", "VIDEO").
+             */
+            mediatype: string;
+            /**
+             * Bit depth of the image file (e.g., 8, 16).
+             */
+            bitdepth: number;
+        };
+    };
+    /**
+     * If the upload failed, this object provides details about the error,
+     * such as the error code and message.
+     */
+    error?: MediaWikiErrorCodeResponse;
+}
+/**
+ * A utility class for handling and accessing the response from a MediaWiki file upload operation.
+ * Provides convenient methods to extract key details about the upload result.
+ */
+export declare class MediaWikiQueryUploadFileResponseClass implements MediaWikiQueryUploadFileResponse {
+    batchcomplete: boolean;
+    upload?: {
+        warnings: string[];
+        result: "Success" | "Warning" | "Error";
+        filename: string;
+        imageinfo: {
+            timestamp: string;
+            user: string;
+            userid: number;
+            size: number;
+            width: number;
+            height: number;
+            parsedcomment: string;
+            comment: string;
+            html: string;
+            canonicaltitle: string;
+            url: string;
+            descriptionurl: string;
+            sha1: string;
+            metadata: MediaWikiImageMetadata[];
+            commonmetadata: MediaWikiSimpleMetadata[];
+            extmetadata: Record<string, {
+                value: string;
+                source: string;
+                hidden?: string;
+            }>;
+            mime: string;
+            mediatype: string;
+            bitdepth: number;
+        };
+    };
+    error?: MediaWikiErrorCodeResponse;
+    constructor(data: MediaWikiQueryUploadFileResponse | null | undefined);
+    getResult(): string;
+    getFilename(): string;
+    getCanonicalTitle(): string;
+    getFileUrl(): string;
+    getDescriptionUrl(): string;
+    getSha1(): string;
+    getMime(): string;
+    getMediaType(): string;
+    getError(): MediaWikiErrorCodeResponse | undefined;
+}
+interface MediaWikiQuerySearchTitlesOptions {
+    query: string;
+    limit: number;
+    namespace?: string | string[] | number | number[];
+}
 /**
  * Custom error class for MediaWiki API-specific errors.
  * This class extends the standard `Error` and provides additional properties
@@ -2998,6 +3304,24 @@ export declare class MediaWikiApiError extends Error {
      */
     constructor(message: string, status: number, responseText: string, responseData?: any);
 }
+interface MediaWikiClient {
+    parent: MediaWiki;
+    query(options: MediaWikiPageOptions): Promise<MediaWikiQueryResponse>;
+    page(titles: string[]): Promise<MediaWikiQueryPageResponseClass>;
+    search(srsearch: string, srnamespace?: string[] | null, srlimit?: number | null): Promise<MediaWikiQuerySearchResponse>;
+    siteInfo(): Promise<MediaWikiQuerySiteInfoResponse>;
+    opensearch(options: MediaWikiQueryOpenSearchOptions): Promise<MediaWikiQueryOpenSearchResponse>;
+    parse(options: MediaWikiQueryParseOptions): Promise<MediaWikiQueryParseResponseClass>;
+    categories(options: MediaWikiQueryCategoriesOptions): Promise<MediaWikiQueryCategoriesResponse>;
+    revisions(options: MediaWikiQueryRevisionsOptions): Promise<MediaWikiQueryRevisionsResponse>;
+    summary(options: MediaWikiQuerySummaryOptions): Promise<MediaWikiQuerySummaryResponseClass>;
+    userInfo(): Promise<MediaWikiQueryUserInfoResponseClass>;
+    getToken(options: MediaWikiQueryTokensOptions): Promise<MediaWikiQueryTokensResponseClass>;
+    editPage(options: MediaWikiQueryEditPageOptions): Promise<MediaWikiQueryEditPageResponseClass>;
+    random(): Promise<MediaWikiQueryRandomResponse>;
+    uploadFile(options: MediaWikiQueryUploadFileOptions): Promise<MediaWikiQueryUploadFileResponseClass>;
+    searchTitles(options: MediaWikiQuerySearchTitlesOptions): Promise<string[]>;
+}
 /**
  * A client for interacting with the MediaWiki API.
  * Provides methods for common API actions.
@@ -3008,6 +3332,8 @@ export declare class MediaWiki {
     private cookieStore;
     private authorized;
     private siteInfo;
+    client: MediaWikiClient;
+    private parent;
     /**
      * Creates an instance of the MediaWiki client.
      * @param options - The configuration options for the client.
@@ -3129,121 +3455,5 @@ export declare class MediaWiki {
         id: number;
         name: string;
     }[];
-    /**
-     * API client methods.
-     */
-    client: {
-        /**
-         * Executes a full MediaWiki API query with various combinations of prop, meta, and list options.
-         *
-         * @param options - The detailed query options.
-         * @returns A promise resolving to the full MediaWiki API response.
-         * @throws {Error} If required options are missing or incompatible.
-         *
-         * @example
-         * mediaWiki.client.query({
-         *   titles: ["Main Page"],
-         *   prop: ["extracts", "categories"],
-         *   indexpageids: true
-         * }).then(response => {
-         *   console.log(response);
-         * });
-         */
-        query: (options: MediaWikiPageOptions) => Promise<MediaWikiQueryResponse>;
-        /**
-         * Retrieves basic content and metadata for one or more pages by title.
-         * Uses 'query' with predefined props such as 'extracts', 'categories', 'revisions'.
-         *
-         * @param titles - List of page titles to retrieve.
-         * @returns A promise resolving to the page response data.
-         * @throws {Error} If titles is missing or empty.
-         *
-         * @example
-         * mediaWiki.client.page(["Main Page"])
-         *   .then(pageData => console.log(pageData));
-         */
-        page: (titles: string[]) => Promise<MediaWikiQueryPageResponseClass>;
-        /**
-         * Searches the wiki using the 'search' list API.
-         * @param srsearch - The search query string; must be non-empty.
-         * @param srnamespace - Optional array of namespaces to limit the search.
-         * @param srlimit - Optional number to limit the number of results (default 10).
-         * @returns Promise resolving to the search results response.
-         */
-        search: (srsearch: string, srnamespace?: string[] | null, srlimit?: number | null) => Promise<MediaWikiQuerySearchResponse>;
-        /**
-         * Fetches general site metadata via 'meta=siteinfo'.
-         * Includes site name, generator, case sensitivity, and namespaces.
-         * @returns Promise resolving to site info data.
-         * @example
-         * async function getSiteDetails() {
-         *   const client = new MediaWiki({ baseURL: "https://en.wikipedia.org/w/api.php" });
-         *   try {
-         *     const siteInfo = await client.client.siteInfo();
-         *     console.log(siteInfo.query.general.sitename);
-         *   } catch (error) {
-         *     console.error("Failed to get site info:", error);
-         *   }
-         * }
-         * getSiteDetails();
-         * @see https://www.mediawiki.org/wiki/API:Siteinfo
-         */
-        siteInfo: () => Promise<MediaWikiQuerySiteInfoResponse>;
-        /**
-        * Performs a legacy 'opensearch' API call for autocomplete-like suggestions.
-        * @param options - Object containing 'search' string and optional 'limit', 'namespace', 'suggest'.
-        * @returns Promise resolving to OpenSearch formatted results.
-        * @throws If options or search term is missing.
-        */
-        opensearch: (options: MediaWikiQueryOpenSearchOptions) => Promise<MediaWikiQueryOpenSearchResponse>;
-        /**
-         * Parses a page or text content using the 'parse' API action.
-         * Can return rendered HTML, sections, categories, etc.
-         * @param options - Must include at least one of 'page', 'pageid', or 'text'.
-         * @returns Promise resolving to the parsed content response class instance.
-         * @throws If required parameters are missing.
-         */
-        parse: (options: MediaWikiQueryParseOptions) => Promise<MediaWikiQueryParseResponseClass>;
-        /**
-         * Retrieves categories of a wiki page by its title.
-         * @param options - Must include a non-empty 'title' string.
-         * @returns Promise resolving to categories response.
-         * @throws If 'title' is missing or invalid.
-         */
-        categories: (options: MediaWikiQueryCategoriesOptions) => Promise<MediaWikiQueryCategoriesResponse>;
-        /**
-         * Retrieves revision history of a page by its title.
-         * @param options - Must include a non-empty 'title' string; optionally 'rvlimit'.
-         * @returns Promise resolving to revisions response.
-         * @throws If 'title' is missing or invalid.
-         */
-        revisions: (options: MediaWikiQueryRevisionsOptions) => Promise<MediaWikiQueryRevisionsResponse>;
-        /**
-         * Retrieves a summary extract (intro paragraph) of a page.
-         * @param options - Must include a non-empty 'title' string.
-         * @returns Promise resolving to a summary response class instance.
-         * @throws If 'title' is missing or invalid.
-         */
-        summary: (options: MediaWikiQuerySummaryOptions) => Promise<MediaWikiQuerySummaryResponseClass>;
-        /**
-         * Retrieves information about the current user.
-         * @returns Promise resolving to user info response class instance.
-         */
-        userInfo: () => Promise<MediaWikiQueryUserInfoResponseClass>;
-        /**
-         * Retrieves tokens for given types, such as CSRF tokens.
-         * @param options - Object with 'type' specifying token types to fetch.
-         * @returns Promise resolving to tokens response class instance.
-         */
-        getToken: (options: MediaWikiQueryTokensOptions) => Promise<MediaWikiQueryTokensResponseClass>;
-        /**
-         * Edits a page by providing 'title' or 'pageid' and new 'text'.
-         * Requires a CSRF token.
-         * @param options - Must include either 'title' or 'pageid', and 'text'.
-         * @returns Promise resolving to the edit page response class instance.
-         * @throws If required parameters are missing.
-         */
-        editPage: (options: MediaWikiQueryEditPageOptions) => Promise<MediaWikiQueryEditPageResponseClass>;
-        random: () => Promise<MediaWikiQueryRandomResponse>;
-    };
 }
+export {};
